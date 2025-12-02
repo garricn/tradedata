@@ -18,7 +18,7 @@ jobs:
       - name: Sync dependencies
         run: uv sync --all-extras --locked
       - name: Check ruff formatting
-        run: uv run ruff format --check .
+        run: uv run ruff format --check . --exclude .venv
 
   lint:
     runs-on: ubuntu-latest
@@ -31,7 +31,7 @@ jobs:
       - name: Sync dependencies
         run: uv sync --all-extras --locked
       - name: Lint (ruff)
-        run: uv run ruff check .
+        run: uv run ruff check . --exclude .venv
 
   type-check:
     runs-on: ubuntu-latest
@@ -44,7 +44,7 @@ jobs:
       - name: Sync dependencies
         run: uv sync --all-extras --locked
       - name: Type check (mypy)
-        run: uv run mypy src/ --ignore-missing-imports
+        run: uv run mypy src/ tests/ --ignore-missing-imports
 
   security:
     runs-on: ubuntu-latest
@@ -57,7 +57,7 @@ jobs:
       - name: Sync dependencies
         run: uv sync --all-extras --locked
       - name: Security scan (bandit)
-        run: uv run bandit -r src/ -f json
+        run: uv run bandit -r . --exclude .venv -f json
 
   test:
     runs-on: ubuntu-latest
