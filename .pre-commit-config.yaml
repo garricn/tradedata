@@ -78,12 +78,12 @@ repos:
           - id: python-no-eval
           - id: python-no-log-warn
 
-  # Run tests on pre-push
+    # Run tests on pre-push
     - repo: local
       hooks:
           - id: pytest
             name: pytest
-            entry: uv run pytest
+            entry: bash -c 'uv run pytest || [ $? -eq 5 ]'
             language: system
             pass_filenames: false
             always_run: false
