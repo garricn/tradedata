@@ -309,10 +309,15 @@ ______________________________________________________________________
 - enriched_data
  - transaction_id (foreign key)
  - timestamp (when enrichment was done)
- - greeks (JSON: delta, gamma, theta, vega)
+ - enrichment_method (TEXT: 'api', 'black_scholes', etc.) - tracks data source
+ - enrichment_version (TEXT) - supports re-enrichment with improved logic
+ - greeks (JSON: delta, gamma, theta, vega) - computed results
  - implied_volatility
- - underlying_price
+ - underlying_price (at trade time) - intermediate data, supports recomputation
+ - historical_volatility (for Black-Scholes recomputation) - intermediate data
+ - risk_free_rate (used in computation) - intermediate data
  - technical_indicators (JSON: RSI, MACD, EMA, etc.)
+ - Note: Schema may need adjustment based on API validation (see ENRICHMENT_CONSTRAINTS.md in rhscrape)
 
 - transaction_links
  - id (UUID)
@@ -405,6 +410,8 @@ ______________________________________________________________________
 
 ## Phase 2: Data Enrichment
 
+**⚠️ Important:** Enrichment strategy validation is in progress. See `../rhscrape/docs/ENRICHMENT_CONSTRAINTS.md` for current status. The `enriched_data` schema may need adjustment based on API availability validation.
+
 ### 2.1 Enrichment Pipeline
 
 **File:** `src/enrichment/enricher.py`
@@ -416,13 +423,23 @@ ______________________________________________________________________
 1. For each transaction, fetch market data at exact timestamp:
 
    ```
-        - Option chain data → Greeks, IV
+        - Option chain data → Greeks, IV (source TBD: Massive/Theta Data API vs Black-Scholes computation)
         - Historical stock data → Technical indicators
    ```
 
-1. Store enriched data in `enriched_data` table
+1. Store enriched data in `enriched_data` table:
+
+   - Store computed results (Greeks, IV, technicals)
+   - Store intermediate inputs (underlying_price, volatility, risk_free_rate) for recomputation support
+   - Track enrichment method and version for re-enrichment support
 
 1. **Error Handling:** Fail loud, hard, and fast. No graceful error handling during initial development. If enrichment fails, raise exception immediately.
+
+**Enrichment Strategy Validation Required:**
+
+- Validate Massive/Theta Data APIs for historical Greeks (see ENRICHMENT_CONSTRAINTS.md)
+- If APIs unavailable, implement Black-Scholes computation fallback
+- Schema design should accommodate both approaches
 
 **Enrichment Sources:**
 
@@ -434,11 +451,20 @@ ______________________________________________________________________
 
 **File:** `src/enrichment/greeks.py`
 
-- Fetch option chain data at specific timestamp
-- Extract Greeks (delta, gamma, theta, vega) for exact contract
+**⚠️ Strategy TBD:** Greeks source depends on API validation (see ENRICHMENT_CONSTRAINTS.md):
+
+- **Option A (if APIs available):** Fetch from Massive/Theta Data APIs at specific timestamp
+- **Option B (fallback):** Compute via Black-Scholes using historical volatility
+- **Current Status:** API validation in progress
+
+**Implementation:**
+
+- Fetch/compute option Greeks (delta, gamma, theta, vega) for exact contract at trade timestamp
+- Store intermediate inputs (underlying_price, volatility, risk_free_rate) for recomputation
+- Track enrichment method (`enrichment_method` field) to indicate data source
 - **Error Handling:** If historical data unavailable, raise exception (fail fast)
 - Cache results to avoid re-fetching
-- **Re-enrichment:** Allow re-enriching transactions (overwrite existing enriched data) - useful if we add new indicators or improve enrichment logic
+- **Re-enrichment:** Allow re-enriching transactions (overwrite existing enriched data) - useful if we add new indicators, improve enrichment logic, or switch data sources
 
 ### 2.3 Technical Indicators
 
