@@ -241,8 +241,10 @@ ______________________________________________________________________
 **Files:**
 
 - `src/data/schema.py` - Database schema definitions
+- `src/data/models.py` - Python data models (dataclasses/Pydantic)
 - `src/data/normalize.py` - Normalization logic
-- `src/data/storage.py` - SQLite operations
+- `src/data/storage.py` - SQLite operations (low-level)
+- `src/data/repository.py` - Repository pattern for data access
 - `src/data/validator.py` - Data validation
 
 **Database Schema:**
@@ -319,6 +321,29 @@ ______________________________________________________________________
  - link_type (spread, covered_call, etc.)
  - created_at (when link was established)
 ```
+
+**Data Models:**
+
+- Use Python `dataclasses` or `Pydantic` models to represent database entities in memory
+- Models map 1:1 with database tables (Transaction, OptionOrder, OptionLeg, etc.)
+- Type-safe data structures for all operations
+- Models handle serialization/deserialization to/from database
+- Example: `Transaction`, `OptionOrder`, `OptionLeg`, `EnrichedData`, etc.
+
+**Repository Pattern:**
+
+- Repository layer abstracts database operations from business logic
+- Each entity type has a repository (TransactionRepository, OptionOrderRepository, etc.)
+- Repositories provide clean, typed API for CRUD operations
+- Benefits: testability (easy to mock), separation of concerns, consistent interface
+- Example: `TransactionRepository.get_by_id()`, `TransactionRepository.create()`, etc.
+
+**Transaction Management:**
+
+- Use SQLite transactions for multi-step operations (e.g., inserting transaction + legs + executions)
+- Context managers for automatic rollback on errors
+- All related inserts/updates wrapped in single transaction for data integrity
+- Example: Creating an option order with multiple legs must be atomic
 
 **Normalization Strategy:**
 
@@ -599,8 +624,8 @@ ______________________________________________________________________
 
 **Validation:**
 
-- `pydantic` for data validation (optional)
-- Custom validation logic
+- `pydantic` for data models and validation (optional, can use dataclasses instead)
+- Custom validation logic for business rules
 
 **Development Tools:**
 
@@ -620,8 +645,10 @@ tradedata/
 │   ├── data/
 │   │   ├── __init__.py
 │   │   ├── schema.py           # Database schema
+│   │   ├── models.py            # Python data models (dataclasses/Pydantic)
 │   │   ├── normalize.py         # Normalization logic
-│   │   ├── storage.py           # SQLite operations
+│   │   ├── storage.py           # SQLite operations (low-level)
+│   │   ├── repository.py        # Repository pattern for data access
 │   │   └── validator.py          # Data validation
 │   ├── sources/
 │   │   ├── __init__.py
