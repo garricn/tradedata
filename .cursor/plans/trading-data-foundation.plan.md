@@ -234,9 +234,11 @@ ______________________________________________________________________
 
 ## Phase 1: Core Data Infrastructure
 
+**Focus:** Get data from robin_stocks API, normalize it, and store it. Enrichment (Greeks, IV, technicals) deferred to Phase 2.
+
 ### 1.1 Data Normalization & Storage
 
-**Goal:** Create unified schema that works across all data sources
+**Goal:** Create unified schema and storage for core transaction data from robin_stocks API
 
 **Files:**
 
@@ -247,10 +249,14 @@ ______________________________________________________________________
 - `src/data/repository.py` - Repository pattern for data access
 - `src/data/validator.py` - Data validation
 
+**Note:** `enriched_data` table is deferred to Phase 2 (Data Enrichment). Phase 1.1 focuses on core infrastructure: getting data from robin_stocks API, normalizing it, and storing it. Enrichment with Greeks, IV, and technicals will be added in Phase 2 once the core is stable.
+
 **Database Schema:**
 
 ```python
 # Core tables (unified across all sources):
+# Note: enriched_data table deferred to Phase 2 (Data Enrichment)
+
 - transactions
  - id (UUID, primary key)
  - source (robinhood, ibkr, etc.)
@@ -305,19 +311,6 @@ ______________________________________________________________________
  - current_price (cached)
  - unrealized_pnl
  - last_updated
-
-- enriched_data
- - transaction_id (foreign key)
- - timestamp (when enrichment was done)
- - enrichment_method (TEXT: 'api', 'black_scholes', etc.) - tracks data source
- - enrichment_version (TEXT) - supports re-enrichment with improved logic
- - greeks (JSON: delta, gamma, theta, vega) - computed results
- - implied_volatility
- - underlying_price (at trade time) - intermediate data, supports recomputation
- - historical_volatility (for Black-Scholes recomputation) - intermediate data
- - risk_free_rate (used in computation) - intermediate data
- - technical_indicators (JSON: RSI, MACD, EMA, etc.)
- - Note: Schema may need adjustment based on API validation (see ENRICHMENT_CONSTRAINTS.md in rhscrape)
 
 - transaction_links
  - id (UUID)
