@@ -155,7 +155,6 @@ config/sources.yaml
 
 # uv
 .uv/
-uv.lock
 
 # Temporary files
 *.tmp
