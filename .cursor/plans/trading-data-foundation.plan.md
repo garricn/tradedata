@@ -13,7 +13,7 @@
 
 **Key Principle:** This is the **single source of truth** for all trading data. All other projects consume from here.
 
----
+______________________________________________________________________
 
 ## Value Proposition: Why Not Just Use `robin_stocks` Directly?
 
@@ -29,10 +29,13 @@
 **1. Historical Data Enrichment (The Big One)**
 
 - `robin_stocks` gives you current market data, but **not historical snapshots**
+
 - This project fetches and stores market data **at exact trade timestamps**:
-        - What were the Greeks when you opened that spread?
-        - What was the IV when you sold that put?
-        - What was the RSI when you entered that day trade?
+
+  - What were the Greeks when you opened that spread?
+  - What was the IV when you sold that put?
+  - What was the RSI when you entered that day trade?
+
 - **You can't get this from `robin_stocks` directly** - it only provides current data
 
 **2. Persistent Storage & Caching**
@@ -67,9 +70,10 @@
 **6. Time-Series Analysis**
 
 - Historical snapshots enable:
-        - "What conditions led to my best trades?"
-        - "What IV rank works best for my strategy?"
-        - "What technical indicators predicted my winners?"
+
+  - "What conditions led to my best trades?"
+  - "What IV rank works best for my strategy?"
+  - "What technical indicators predicted my winners?"
 
 **Example Use Case:**
 
@@ -89,7 +93,7 @@ print(enriched.rsi_at_trade_time)  # 45.2
 
 **Bottom Line:** If you only need current market data and don't care about historical analysis, use `robin_stocks` directly. If you want to analyze your trading performance with historical context (Greeks, IV, technicals at trade time), this project is essential.
 
----
+______________________________________________________________________
 
 ## Architecture
 
@@ -115,14 +119,18 @@ The library manages its own database internally. Clients **never access the data
 **How it works:**
 
 1. Library manages SQLite database (default: `~/.tradedata/trading.db` or configurable)
-2. Clients interact through library functions, not SQL
-3. Database location can be configured via:
 
-            - Constructor parameter: `DataStore(db_path="/path/to/db.db")`
-            - Environment variable: `TRADEDATA_DB_PATH`
-            - Config file: `~/.tradedata/config.yaml` (future)
+1. Clients interact through library functions, not SQL
 
-4. Library abstracts all database operations
+1. Database location can be configured via:
+
+   ```
+        - Constructor parameter: `DataStore(db_path="/path/to/db.db")`
+        - Environment variable: `TRADEDATA_DB_PATH`
+        - Config file: `~/.tradedata/config.yaml` (future)
+   ```
+
+1. Library abstracts all database operations
 
 **Client Usage Pattern:**
 
@@ -187,17 +195,17 @@ for tx in results:
 - All transaction data (from brokers)
 - All position data (from brokers)
 - Market data snapshots at trade time:
-        - Greeks (delta, gamma, theta, vega) at exact timestamp
-        - Implied volatility at exact timestamp
-        - Underlying stock price at exact timestamp
-        - Option chain data at exact timestamp
+  - Greeks (delta, gamma, theta, vega) at exact timestamp
+  - Implied volatility at exact timestamp
+  - Underlying stock price at exact timestamp
+  - Option chain data at exact timestamp
 
 **SHOULD STORE (Computed but Expensive/Historical):**
 
 - Technical indicators at trade timestamp (RSI, MACD, EMA, etc.)
-        - **Reason:** Historical accuracy - what was RSI at trade time
-        - **Reason:** Performance - don't recalculate every query
-        - **Reason:** Consistency - same calculation method preserved
+  - **Reason:** Historical accuracy - what was RSI at trade time
+  - **Reason:** Performance - don't recalculate every query
+  - **Reason:** Consistency - same calculation method preserved
 
 **CAN COMPUTE (On-Demand):**
 
@@ -222,7 +230,7 @@ enriched_data.rsi_at_trade_time = 45.2
 current_rsi = calculate_rsi(symbol, timeframe='1min')
 ```
 
----
+______________________________________________________________________
 
 ## Phase 1: Core Data Infrastructure (Week 1-2)
 
@@ -335,12 +343,12 @@ class DataSourceAdapter(ABC):
     def extract_transactions(self, start_date=None, end_date=None):
         """Extract transactions from source"""
         pass
-    
+
     @abstractmethod
     def extract_positions(self):
         """Extract current positions"""
         pass
-    
+
     @abstractmethod
     def normalize_transaction(self, raw_transaction):
         """Convert source-specific format to unified schema"""
@@ -368,7 +376,7 @@ class DataSourceAdapter(ABC):
 
 **Error Handling:** Fail loud, hard, and fast. Validation failures raise exceptions immediately. No graceful degradation during initial development.
 
----
+______________________________________________________________________
 
 ## Phase 2: Data Enrichment (Week 2-3)
 
@@ -379,13 +387,17 @@ class DataSourceAdapter(ABC):
 **Enrichment Process:**
 
 1. Identify transactions that need enrichment (options, stocks)
-2. For each transaction, fetch market data at exact timestamp:
 
-            - Option chain data → Greeks, IV
-            - Historical stock data → Technical indicators
+1. For each transaction, fetch market data at exact timestamp:
 
-3. Store enriched data in `enriched_data` table
-4. **Error Handling:** Fail loud, hard, and fast. No graceful error handling during initial development. If enrichment fails, raise exception immediately.
+   ```
+        - Option chain data → Greeks, IV
+        - Historical stock data → Technical indicators
+   ```
+
+1. Store enriched data in `enriched_data` table
+
+1. **Error Handling:** Fail loud, hard, and fast. No graceful error handling during initial development. If enrichment fails, raise exception immediately.
 
 **Enrichment Sources:**
 
@@ -419,7 +431,7 @@ class DataSourceAdapter(ABC):
 - Calculate IV rank/percentile if possible
 - Store IV at trade timestamp
 
----
+______________________________________________________________________
 
 ## Phase 3: Data Sync & Updates (Week 3)
 
@@ -442,7 +454,7 @@ class DataSourceAdapter(ABC):
 - Calculate unrealized P&L
 - Track position lifecycle (open → close)
 
----
+______________________________________________________________________
 
 ## Phase 4: Data Export & APIs (Week 4)
 
@@ -478,12 +490,15 @@ class DataSourceAdapter(ABC):
 **Linking Logic (Initial):**
 
 - Match opening and closing transactions by:
-        - Same underlying symbol
-        - Same strategy type (e.g., "vertical_call_spread")
-        - Opening transaction has `position_effect = "open"`
-        - Closing transaction has `position_effect = "close"`
-        - Closing transaction occurs after opening (within reasonable time window)
+
+  - Same underlying symbol
+  - Same strategy type (e.g., "vertical_call_spread")
+  - Opening transaction has `position_effect = "open"`
+  - Closing transaction has `position_effect = "close"`
+  - Closing transaction occurs after opening (within reasonable time window)
+
 - Store links in `transaction_links` table
+
 - Allow manual override via API
 
 **API Functions:**
@@ -518,7 +533,7 @@ class DataSourceAdapter(ABC):
 - Future web app queries via API
 - MCP server exposes via MCP protocol
 
----
+______________________________________________________________________
 
 ## Phase 5: CLI Interface
 
@@ -555,7 +570,7 @@ tradedata query --type option --days 30
 tradedata export csv --output trades.csv --include-enriched
 ```
 
----
+______________________________________________________________________
 
 ## Technical Stack
 
@@ -595,7 +610,7 @@ tradedata export csv --output trades.csv --include-enriched
 - `bandit` for security scanning
 - `pre-commit` for git hooks
 
----
+______________________________________________________________________
 
 ## File Structure
 
@@ -646,36 +661,44 @@ tradedata/
 └── .env.example
 ```
 
----
+______________________________________________________________________
 
 ## Success Criteria
 
 1. **Data Normalization:**
 
-            - All Robinhood transactions stored in unified schema
-            - Data validation ensures correctness
-            - Original data preserved in raw_data field
+   ```
+        - All Robinhood transactions stored in unified schema
+        - Data validation ensures correctness
+        - Original data preserved in raw_data field
+   ```
 
-2. **Enrichment:**
+1. **Enrichment:**
 
-            - Greeks, IV, technicals fetched for historical timestamps
-            - Enrichment pipeline fails fast on errors (no graceful handling)
-            - Results cached to avoid re-fetching
-            - Re-enrichment supported (overwrite existing enriched data)
+   ```
+        - Greeks, IV, technicals fetched for historical timestamps
+        - Enrichment pipeline fails fast on errors (no graceful handling)
+        - Results cached to avoid re-fetching
+        - Re-enrichment supported (overwrite existing enriched data)
+   ```
 
-3. **Multi-Source Ready:**
+1. **Multi-Source Ready:**
 
-            - Architecture supports adding new data sources
-            - Adapter pattern makes it easy to add sources
-            - Unified schema works across sources
+   ```
+        - Architecture supports adding new data sources
+        - Adapter pattern makes it easy to add sources
+        - Unified schema works across sources
+   ```
 
-4. **Export & Query:**
+1. **Export & Query:**
 
-            - Data can be exported in multiple formats
-            - Query API provides easy access to data
-            - CLI is user-friendly and well-documented
+   ```
+        - Data can be exported in multiple formats
+        - Query API provides easy access to data
+        - CLI is user-friendly and well-documented
+   ```
 
----
+______________________________________________________________________
 
 ## Migration from rhscrape
 
@@ -691,7 +714,7 @@ tradedata/
 - `TradeData` imports from JSON or directly from API
 - Eventually `TradeData` becomes primary data source
 
----
+______________________________________________________________________
 
 ## Development Standards
 
@@ -827,7 +850,7 @@ class Enricher:
     def __init__(self, market_data: MarketDataProvider, storage: Storage):
         self.market_data = market_data
         self.storage = storage
-    
+
     def enrich_transaction(self, transaction):
         greeks = self.market_data.get_greeks(...)
         # ...
@@ -848,22 +871,28 @@ enricher = Enricher(mock_market_data, mock_storage)
 
 1. **Primary: Python Library**
 
-            - Installable via `uv pip install tradedata` or `pip install tradedata`
-            - Importable: `from tradedata import DataStore, sync, enrich`
-            - Used by other projects as a dependency
-            - Provides clean, typed API
+   ```
+        - Installable via `uv pip install tradedata` or `pip install tradedata`
+        - Importable: `from tradedata import DataStore, sync, enrich`
+        - Used by other projects as a dependency
+        - Provides clean, typed API
+   ```
 
-2. **Secondary: CLI Tool**
+1. **Secondary: CLI Tool**
 
-            - Command-line interface for direct user interaction
-            - Thin wrapper around library functions
-            - Useful for one-off operations, debugging, manual syncs
+   ```
+        - Command-line interface for direct user interaction
+        - Thin wrapper around library functions
+        - Useful for one-off operations, debugging, manual syncs
+   ```
 
-3. **NOT:**
+1. **NOT:**
 
-            - Backend server (separate project would be needed)
-            - Web application (separate project)
-            - Real-time streaming service (separate project)
+   ```
+        - Backend server (separate project would be needed)
+        - Web application (separate project)
+        - Real-time streaming service (separate project)
+   ```
 
 **Usage Patterns:**
 
@@ -886,7 +915,7 @@ from tradedata import DataStore
 store = DataStore(db_path="/shared/data/trading.db")
 ```
 
----
+______________________________________________________________________
 
 ## Future Enhancements
 
