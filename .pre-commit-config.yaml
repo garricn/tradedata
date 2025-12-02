@@ -86,5 +86,5 @@ repos:
             entry: bash -c 'uv run pytest || [ $? -eq 5 ]'
             language: system
             pass_filenames: false
-            always_run: false
+            always_run: true
             stages: [pre-push]
