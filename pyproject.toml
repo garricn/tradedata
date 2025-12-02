@@ -16,6 +16,8 @@ dev = [
   "mypy>=1.0.0",
   "bandit>=1.7.0",
   "pre-commit>=3.0.0",
+  "pyyaml>=6.0.0",       # YAML syntax validation
+  "tomli>=2.0.0",        # TOML syntax validation (for Python < 3.11)
 ]
 
 [build-system]
