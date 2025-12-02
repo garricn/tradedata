@@ -6,60 +6,38 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  PYTHON_VERSION: "3.11"
+
 jobs:
   format:
     name: Format Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
-        with:
-          version: latest
-      - name: Install dependencies
-        run: uv sync --dev
-      - name: Check ruff formatting
-        run: uv run ruff format --check .
-      - name: Check markdown formatting
-        run: uv run mdformat --check .
+      - uses: ./.github/actions/setup-env
+      - run: uv run ruff format --check .
+      - run: uv run mdformat --check .
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
-        with:
-          version: latest
-      - name: Install dependencies
-        run: uv sync --dev
-      - name: Run ruff
-        run: uv run ruff check .
+      - uses: ./.github/actions/setup-env
+      - run: uv run ruff check .
 
   type-check:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
-        with:
-          version: latest
-      - name: Install dependencies
-        run: uv sync --dev
-      - name: Run mypy
-        run: uv run mypy src/ --ignore-missing-imports
+      - uses: ./.github/actions/setup-env
+      - run: uv run mypy src/ --ignore-missing-imports
 
   security:
     name: Security Scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
-        with:
-          version: latest
-      - name: Install dependencies
-        run: uv sync --dev
-      - name: Run bandit
-        run: uv run bandit -r src/ -f json
+      - uses: ./.github/actions/setup-env
+      - run: uv run bandit -r src/ -f json
 
   test:
     name: Test (Python ${{ matrix.python-version }})
@@ -68,20 +46,10 @@ jobs:
       matrix:
         python-version: ["3.9", "3.10", "3.11"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
-        with:
-          version: latest
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: uv sync --dev
+      - uses: ./.github/actions/setup-env
       - name: Run tests with coverage
         run: uv run pytest --cov=src/tradedata --cov-report=xml --cov-report=term
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml
           fail_ci_if_error: false
