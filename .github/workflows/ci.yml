@@ -10,38 +10,24 @@ env:
   PYTHON_VERSION: "3.11"
 
 jobs:
-  format:
-    name: Format Check
+  check:
+    name: Format, Lint, Type Check, Security
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-env
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: latest
+      - name: Install dependencies
+        run: uv sync --dev
       - run: uv run ruff format --check .
-      - run: uv run mdformat --check .
-
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-env
       - run: uv run ruff check .
-
-  type-check:
-    name: Type Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-env
       - run: uv run mypy src/ --ignore-missing-imports
-
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-env
       - run: uv run bandit -r src/ -f json
+      - run: uv run mdformat --check .
 
   test:
     name: Test (Python ${{ matrix.python-version }})
@@ -51,7 +37,14 @@ jobs:
         python-version: ["3.9", "3.10", "3.11"]
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-env
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: latest
+      - name: Install dependencies
+        run: uv sync --dev
       - name: Run tests with coverage
         run: uv run pytest --cov=src/tradedata --cov-report=xml --cov-report=term
       - uses: codecov/codecov-action@v4
