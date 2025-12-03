@@ -5,7 +5,7 @@ Extracts and normalizes trading data from Robinhood API using robin_stocks libra
 
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional, Protocol
 
 try:
@@ -251,22 +251,25 @@ class RobinhoodAdapter(DataSourceAdapter):
             if not tx_date:
                 continue
 
-            # Parse dates for comparison
+            # Parse transaction timestamp, ensuring it's timezone-aware (UTC)
             tx_datetime = datetime.fromisoformat(tx_date.replace("Z", "+00:00"))
+            if tx_datetime.tzinfo is None:
+                # If still naive, assume UTC
+                tx_datetime = tx_datetime.replace(tzinfo=timezone.utc)
 
             if start_date:
                 start_dt = datetime.fromisoformat(start_date)
-                # Make start_dt timezone-aware if tx_datetime is aware
-                if tx_datetime.tzinfo is not None and start_dt.tzinfo is None:
-                    start_dt = start_dt.replace(tzinfo=tx_datetime.tzinfo)
+                # Ensure start_date is timezone-aware (UTC) for comparison
+                if start_dt.tzinfo is None:
+                    start_dt = start_dt.replace(tzinfo=timezone.utc)
                 if tx_datetime < start_dt:
                     continue
 
             if end_date:
                 end_dt = datetime.fromisoformat(end_date)
-                # Make end_dt timezone-aware if tx_datetime is aware
-                if tx_datetime.tzinfo is not None and end_dt.tzinfo is None:
-                    end_dt = end_dt.replace(tzinfo=tx_datetime.tzinfo)
+                # Ensure end_date is timezone-aware (UTC) for comparison
+                if end_dt.tzinfo is None:
+                    end_dt = end_dt.replace(tzinfo=timezone.utc)
                 if tx_datetime > end_dt:
                     continue
 
