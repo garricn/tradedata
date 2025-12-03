@@ -139,7 +139,7 @@ class RobinhoodAdapter(DataSourceAdapter):
             stock_orders = self.rh.get_all_stock_orders()
             if stock_orders:
                 transactions.extend(stock_orders)
-        except Exception:
+        except Exception:  # nosec - intentionally catch all to allow partial data retrieval
             # Log but don't fail - some accounts may not have stock orders
             pass
 
@@ -148,7 +148,7 @@ class RobinhoodAdapter(DataSourceAdapter):
             option_orders = self.rh.get_all_option_orders()
             if option_orders:
                 transactions.extend(option_orders)
-        except Exception:
+        except Exception:  # nosec - intentionally catch all to allow partial data retrieval
             # Log but don't fail - some accounts may not have option orders
             pass
 
@@ -174,7 +174,7 @@ class RobinhoodAdapter(DataSourceAdapter):
             stock_positions = self.rh.get_open_stock_positions()
             if stock_positions:
                 positions.extend(stock_positions)
-        except Exception:
+        except Exception:  # nosec - intentionally catch all to allow partial data retrieval
             # Log but don't fail
             pass
 
@@ -183,7 +183,7 @@ class RobinhoodAdapter(DataSourceAdapter):
             option_positions = self.rh.get_open_option_positions()
             if option_positions:
                 positions.extend(option_positions)
-        except Exception:
+        except Exception:  # nosec - intentionally catch all to allow partial data retrieval
             # Log but don't fail
             pass
 
@@ -256,11 +256,17 @@ class RobinhoodAdapter(DataSourceAdapter):
 
             if start_date:
                 start_dt = datetime.fromisoformat(start_date)
+                # Make start_dt timezone-aware if tx_datetime is aware
+                if tx_datetime.tzinfo is not None and start_dt.tzinfo is None:
+                    start_dt = start_dt.replace(tzinfo=tx_datetime.tzinfo)
                 if tx_datetime < start_dt:
                     continue
 
             if end_date:
                 end_dt = datetime.fromisoformat(end_date)
+                # Make end_dt timezone-aware if tx_datetime is aware
+                if tx_datetime.tzinfo is not None and end_dt.tzinfo is None:
+                    end_dt = end_dt.replace(tzinfo=tx_datetime.tzinfo)
                 if tx_datetime > end_dt:
                     continue
 
@@ -322,7 +328,7 @@ class RobinhoodAdapter(DataSourceAdapter):
                     return timestamp
                 # If it's a datetime object, convert to ISO
                 if hasattr(timestamp, "isoformat"):
-                    return timestamp.isoformat()
+                    return str(timestamp.isoformat())
 
         # Default to current time if no timestamp found
         return datetime.utcnow().isoformat() + "Z"
@@ -379,7 +385,7 @@ class RobinhoodAdapter(DataSourceAdapter):
             leg_id = str(uuid.uuid4())
 
             # Extract leg fields
-            strike_price = self._safe_float(raw_leg.get("strike_price", 0))
+            strike_price = self._safe_float(raw_leg.get("strike_price", 0)) or 0.0
             expiration_date = self._extract_expiration_date(raw_leg)
             option_type = raw_leg.get("option_type", "").lower()
             side = raw_leg.get("side", "").lower()
@@ -427,8 +433,8 @@ class RobinhoodAdapter(DataSourceAdapter):
             if leg_ids and idx < len(leg_ids):
                 leg_id = leg_ids[idx]
 
-            price = self._safe_float(raw_exec.get("price", 0))
-            quantity = self._safe_float(raw_exec.get("quantity", 0))
+            price = self._safe_float(raw_exec.get("price", 0)) or 0.0
+            quantity = self._safe_float(raw_exec.get("quantity", 0)) or 0.0
             timestamp = self._extract_timestamp(raw_exec)
             settlement_date = raw_exec.get("settlement_date")
 
@@ -463,9 +469,9 @@ class RobinhoodAdapter(DataSourceAdapter):
         # Extract stock order fields
         symbol = raw_transaction.get("symbol", "")
         side = raw_transaction.get("side", "").lower()
-        quantity = self._safe_float(raw_transaction.get("quantity", 0))
-        price = self._safe_float(raw_transaction.get("price"))
-        average_price = self._safe_float(raw_transaction.get("average_price"))
+        quantity = self._safe_float(raw_transaction.get("quantity", 0)) or 0.0
+        price = self._safe_float(raw_transaction.get("price")) or 0.0
+        average_price = self._safe_float(raw_transaction.get("average_price")) or 0.0
 
         return StockOrder(
             id=transaction_id,
@@ -487,10 +493,10 @@ class RobinhoodAdapter(DataSourceAdapter):
         """
         position_id = str(uuid.uuid4())
         symbol = raw_position.get("symbol", "")
-        quantity = self._safe_float(raw_position.get("quantity", 0))
-        cost_basis = self._safe_float(raw_position.get("cost_basis"))
-        current_price = self._safe_float(raw_position.get("current_price"))
-        unrealized_pnl = self._safe_float(raw_position.get("unrealized_pnl"))
+        quantity = self._safe_float(raw_position.get("quantity", 0)) or 0.0
+        cost_basis = self._safe_float(raw_position.get("cost_basis")) or 0.0
+        current_price = self._safe_float(raw_position.get("current_price")) or 0.0
+        unrealized_pnl = self._safe_float(raw_position.get("unrealized_pnl")) or 0.0
         last_updated = self._extract_timestamp(raw_position)
 
         return Position(
@@ -538,7 +544,7 @@ class RobinhoodAdapter(DataSourceAdapter):
                 if isinstance(exp_date, str):
                     return exp_date
                 if hasattr(exp_date, "isoformat"):
-                    return exp_date.isoformat()
+                    return str(exp_date.isoformat())
 
         # Default to a far future date if not found
         return "2099-12-31"
