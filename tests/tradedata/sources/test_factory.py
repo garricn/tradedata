@@ -3,6 +3,7 @@
 from typing import Any, Optional
 
 import pytest
+
 from tradedata.data.models import Transaction
 from tradedata.sources.base import DataSourceAdapter
 from tradedata.sources.factory import SourceFactory, create_adapter, get_factory
