@@ -242,7 +242,7 @@ class RobinhoodAdapter(DataSourceAdapter):
                 tx_datetime = tx_datetime.replace(tzinfo=timezone.utc)
 
             if start_date:
-                start_dt = datetime.fromisoformat(start_date)
+                start_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
                 # Ensure start_date is timezone-aware (UTC) for comparison
                 if start_dt.tzinfo is None:
                     start_dt = start_dt.replace(tzinfo=timezone.utc)
@@ -250,7 +250,7 @@ class RobinhoodAdapter(DataSourceAdapter):
                     continue
 
             if end_date:
-                end_dt = datetime.fromisoformat(end_date)
+                end_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
                 # Ensure end_date is timezone-aware (UTC) for comparison
                 if end_dt.tzinfo is None:
                     end_dt = end_dt.replace(tzinfo=timezone.utc)
