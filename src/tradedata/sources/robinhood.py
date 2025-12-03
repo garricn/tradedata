@@ -134,23 +134,15 @@ class RobinhoodAdapter(DataSourceAdapter):
         """
         transactions = []
 
-        # Get stock orders
-        try:
-            stock_orders = self.rh.get_all_stock_orders()
-            if stock_orders:
-                transactions.extend(stock_orders)
-        except Exception:  # nosec - intentionally catch all to allow partial data retrieval
-            # Log but don't fail - some accounts may not have stock orders
-            pass
+        # Get stock orders - fail hard if API call fails
+        stock_orders = self.rh.get_all_stock_orders()
+        if stock_orders:
+            transactions.extend(stock_orders)
 
-        # Get option orders
-        try:
-            option_orders = self.rh.get_all_option_orders()
-            if option_orders:
-                transactions.extend(option_orders)
-        except Exception:  # nosec - intentionally catch all to allow partial data retrieval
-            # Log but don't fail - some accounts may not have option orders
-            pass
+        # Get option orders - fail hard if API call fails
+        option_orders = self.rh.get_all_option_orders()
+        if option_orders:
+            transactions.extend(option_orders)
 
         # Filter by date if provided
         if start_date or end_date:
@@ -169,23 +161,15 @@ class RobinhoodAdapter(DataSourceAdapter):
         """
         positions = []
 
-        # Get stock positions
-        try:
-            stock_positions = self.rh.get_open_stock_positions()
-            if stock_positions:
-                positions.extend(stock_positions)
-        except Exception:  # nosec - intentionally catch all to allow partial data retrieval
-            # Log but don't fail
-            pass
+        # Get stock positions - fail hard if API call fails
+        stock_positions = self.rh.get_open_stock_positions()
+        if stock_positions:
+            positions.extend(stock_positions)
 
-        # Get option positions
-        try:
-            option_positions = self.rh.get_open_option_positions()
-            if option_positions:
-                positions.extend(option_positions)
-        except Exception:  # nosec - intentionally catch all to allow partial data retrieval
-            # Log but don't fail
-            pass
+        # Get option positions - fail hard if API call fails
+        option_positions = self.rh.get_open_option_positions()
+        if option_positions:
+            positions.extend(option_positions)
 
         return positions
 
@@ -270,6 +254,9 @@ class RobinhoodAdapter(DataSourceAdapter):
                 # Ensure end_date is timezone-aware (UTC) for comparison
                 if end_dt.tzinfo is None:
                     end_dt = end_dt.replace(tzinfo=timezone.utc)
+                # If end_date is date-only (no time component), include entire day
+                if end_dt.time() == datetime.min.time():
+                    end_dt = end_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
                 if tx_datetime > end_dt:
                     continue
 
