@@ -3,7 +3,9 @@ name = "tradedata"
 version = "0.1.0"
 description = "Unified trading data foundation layer"
 requires-python = ">=3.9"
-dependencies = []
+dependencies = [
+    "robin-stocks>=2.0.0",
+]
 
 [project.optional-dependencies]
 dev = [
