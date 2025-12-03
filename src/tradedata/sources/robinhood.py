@@ -45,16 +45,16 @@ class RobinhoodAPIWrapper:
         return self.rh.login(username, password)  # type: ignore[no-any-return]
 
     def get_all_stock_orders(self) -> list[dict[str, Any]]:
-        """Get all stock orders via orders.get_all_stocks()."""
-        return self.rh.orders.get_all_stocks() or []  # type: ignore[no-any-return]
+        """Get all stock orders via orders.get_all_stock_orders()."""
+        return self.rh.orders.get_all_stock_orders() or []  # type: ignore[no-any-return]
 
     def get_all_option_orders(self) -> list[dict[str, Any]]:
-        """Get all option orders via options.get_all_options()."""
-        return self.rh.options.get_all_options() or []  # type: ignore[no-any-return]
+        """Get all option orders via options.get_all_option_orders()."""
+        return self.rh.options.get_all_option_orders() or []  # type: ignore[no-any-return]
 
     def get_open_stock_positions(self) -> list[dict[str, Any]]:
-        """Get open stock positions via stocks.get_open_stock_positions()."""
-        return self.rh.stocks.get_open_stock_positions() or []  # type: ignore[no-any-return]
+        """Get open stock positions via stocks.get_all_stock_positions()."""
+        return self.rh.stocks.get_all_stock_positions() or []  # type: ignore[no-any-return]
 
     def get_open_option_positions(self) -> list[dict[str, Any]]:
         """Get open option positions via options.get_all_option_positions()."""
