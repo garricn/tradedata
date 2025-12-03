@@ -9,9 +9,9 @@ from datetime import datetime, timezone
 from typing import Any, Optional, Protocol
 
 try:
-    import robin_stocks.robinhood as rh_default
+    import robin_stocks.robinhood as rh_module
 except ImportError:
-    rh_default = None  # type: ignore
+    rh_module = None  # type: ignore
 
 from tradedata.data.models import (
     Execution,
@@ -22,6 +22,43 @@ from tradedata.data.models import (
     Transaction,
 )
 from tradedata.sources.base import DataSourceAdapter
+
+
+class RobinhoodAPIWrapper:
+    """Wrapper for robin_stocks.robinhood to provide flat method access.
+
+    robin_stocks organizes methods under submodules (orders, options, etc),
+    but this wrapper provides a flat interface that matches the RobinhoodAPI
+    protocol for simpler dependency injection and testing.
+    """
+
+    def __init__(self, rh_module: Any):
+        """Initialize wrapper with robin_stocks.robinhood module.
+
+        Args:
+            rh_module: robin_stocks.robinhood module instance
+        """
+        self.rh = rh_module
+
+    def login(self, username: str, password: str) -> dict[str, Any]:
+        """Login to Robinhood account."""
+        return self.rh.login(username, password)  # type: ignore[no-any-return]
+
+    def get_all_stock_orders(self) -> list[dict[str, Any]]:
+        """Get all stock orders via orders.get_all_stocks()."""
+        return self.rh.orders.get_all_stocks() or []  # type: ignore[no-any-return]
+
+    def get_all_option_orders(self) -> list[dict[str, Any]]:
+        """Get all option orders via options.get_all_options()."""
+        return self.rh.options.get_all_options() or []  # type: ignore[no-any-return]
+
+    def get_open_stock_positions(self) -> list[dict[str, Any]]:
+        """Get open stock positions via stocks.get_open_stock_positions()."""
+        return self.rh.stocks.get_open_stock_positions() or []  # type: ignore[no-any-return]
+
+    def get_open_option_positions(self) -> list[dict[str, Any]]:
+        """Get open option positions via options.get_all_option_positions()."""
+        return self.rh.options.get_all_option_positions() or []  # type: ignore[no-any-return]
 
 
 class RobinhoodAPI(Protocol):
@@ -106,7 +143,13 @@ class RobinhoodAdapter(DataSourceAdapter):
         """
         self.username = username
         self.password = password
-        self.rh: RobinhoodAPI = robin_stocks if robin_stocks is not None else rh_default  # type: ignore[assignment]
+        # Use injected implementation or create wrapper for default robin_stocks module
+        if robin_stocks is not None:
+            self.rh: RobinhoodAPI = robin_stocks  # type: ignore[assignment]
+        elif rh_module is not None:
+            self.rh = RobinhoodAPIWrapper(rh_module)  # type: ignore[assignment]
+        else:
+            self.rh = None  # type: ignore[assignment]
 
         if self.rh is None:
             raise ImportError(
