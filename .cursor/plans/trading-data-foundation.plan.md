@@ -232,9 +232,11 @@ current_rsi = calculate_rsi(symbol, timeframe='1min')
 
 ______________________________________________________________________
 
-## Phase 1: Core Data Infrastructure
+## Phase 1: Core Data Infrastructure ✓ COMPLETE
 
-**Focus:** Get data from robin_stocks API, normalize it, and store it. Enrichment (Greeks, IV, technicals) deferred to Phase 2.
+**Focus:** Get data from robin_stocks API, normalize it, and store it. Enrichment (Greeks, IV, technicals) deferred to Phase 6.
+
+**Status:** Complete - models, validators, repositories, storage, and adapters implemented.
 
 ### 1.1 Data Normalization & Storage
 
@@ -401,87 +403,177 @@ class DataSourceAdapter(ABC):
 
 ______________________________________________________________________
 
-## Phase 2: Data Enrichment
+## Phase 2: Application Layer ← IN PROGRESS
 
-**⚠️ Important:** Enrichment strategy validation is in progress. See `../rhscrape/docs/ENRICHMENT_CONSTRAINTS.md` for current status. The `enriched_data` schema may need adjustment based on API availability validation.
+**Focus:** Build orchestration layer that ties together domain, repositories, and adapters. Manage credentials securely and provide simple functions to sync data.
 
-### 2.1 Enrichment Pipeline
+**Architecture Pattern:** Pragmatic Python layered architecture
 
-**File:** `src/enrichment/enricher.py`
+- Domain layer (models, validators) - no dependencies
+- Infrastructure layer (repositories, adapters) - implements interfaces
+- **Application layer (NEW)** - orchestrates domain + infrastructure
+- Interface layer (CLI, MCP, API) - thin wrappers around application
 
-**Enrichment Process:**
+### 2.1 Credential Management
 
-1. Identify transactions that need enrichment (options, stocks)
+**File:** `src/tradedata/application/credentials.py`
 
-1. For each transaction, fetch market data at exact timestamp:
+**Purpose:** Secure credential storage using system keyring (following perfina pattern)
 
-   ```
-        - Option chain data → Greeks, IV (source TBD: Massive/Theta Data API vs Black-Scholes computation)
-        - Historical stock data → Technical indicators
-   ```
+**Functions:**
 
-1. Store enriched data in `enriched_data` table:
-
-   - Store computed results (Greeks, IV, technicals)
-   - Store intermediate inputs (underlying_price, volatility, risk_free_rate) for recomputation support
-   - Track enrichment method and version for re-enrichment support
-
-1. **Error Handling:** Fail loud, hard, and fast. No graceful error handling during initial development. If enrichment fails, raise exception immediately.
-
-**Enrichment Strategy Validation Required:**
-
-- Validate Massive/Theta Data APIs for historical Greeks (see ENRICHMENT_CONSTRAINTS.md)
-- If APIs unavailable, implement Black-Scholes computation fallback
-- Schema design should accommodate both approaches
-
-**Enrichment Sources:**
-
-- Option Greeks: `robin_stocks.options.get_option_market_data()`
-- Historical stock data: `robin_stocks.stocks.get_historicals()`
-- Technical indicators: Calculate from historical data (pandas-ta or ta-lib)
-
-### 2.2 Greeks Fetcher
-
-**File:** `src/enrichment/greeks.py`
-
-**⚠️ Strategy TBD:** Greeks source depends on API validation (see ENRICHMENT_CONSTRAINTS.md):
-
-- **Option A (if APIs available):** Fetch from Massive/Theta Data APIs at specific timestamp
-- **Option B (fallback):** Compute via Black-Scholes using historical volatility
-- **Current Status:** API validation in progress
+- `get_credentials(source="robinhood")` → Returns (email, password) from system keychain
+- `store_credentials(source, email, password)` → Saves credentials to system keychain
+- `delete_credentials(source)` → Removes credentials from system keychain
 
 **Implementation:**
 
-- Fetch/compute option Greeks (delta, gamma, theta, vega) for exact contract at trade timestamp
-- Store intermediate inputs (underlying_price, volatility, risk_free_rate) for recomputation
-- Track enrichment method (`enrichment_method` field) to indicate data source
-- **Error Handling:** If historical data unavailable, raise exception (fail fast)
-- Cache results to avoid re-fetching
-- **Re-enrichment:** Allow re-enriching transactions (overwrite existing enriched data) - useful if we add new indicators, improve enrichment logic, or switch data sources
+- Uses `keyring` library for macOS Keychain / Windows Credential Manager / Linux Secret Service
+- Service name: `com.tradedata.{source}` (e.g., `com.tradedata.robinhood`)
+- Keys stored: `{source}_email`, `{source}_password`
+- Broker-agnostic design (supports robinhood, ibkr, etc.)
 
-### 2.3 Technical Indicators
+**Authentication Flow:**
 
-**File:** `src/enrichment/technicals.py`
+- Robinhood uses SMS-based MFA (two-step: SMS code + device approval)
+- `robin_stocks` handles MFA prompts and session caching automatically
+- Session cached between runs - only need MFA when session expires
+- See `../rhscrape/docs/SESSION_SUMMARY.md` for detailed auth flow
 
-- Calculate RSI, MACD, EMA, etc. from historical price data
-- Support multiple timeframes (1min, 5min, daily, etc.)
-- Store indicators at trade timestamp
+### 2.2 Data Sync Orchestration
 
-### 2.4 IV Fetcher
+**File:** `src/tradedata/application/robinhood_sync.py`
 
-**File:** `src/enrichment/iv.py`
+**Purpose:** Orchestrate the full sync workflow - get credentials, login, extract, normalize, validate, store
 
-- Extract implied volatility from option chain data
-- Calculate IV rank/percentile if possible
-- Store IV at trade timestamp
+**Functions:**
+
+```python
+def sync_transactions(source="robinhood", start_date=None, end_date=None):
+    """Sync transactions from broker API to local database.
+
+    Workflow:
+    1. Get credentials from keyring
+    2. Login via adapter (robin_stocks handles MFA if needed)
+    3. Extract raw transactions via adapter
+    4. Normalize each transaction via adapter
+    5. Validate normalized data
+    6. Store via repository
+
+    Args:
+        source: Data source name (default: "robinhood")
+        start_date: Optional start date filter (ISO format)
+        end_date: Optional end date filter (ISO format)
+
+    Raises:
+        CredentialsNotFoundError: If credentials not in keyring
+        ValidationError: If data validation fails
+        Exception: If API call or database operation fails
+    """
+    pass
+
+def sync_positions(source="robinhood"):
+    """Sync current positions from broker API to local database.
+
+    Same workflow as sync_transactions but for positions.
+    """
+    pass
+```
+
+**Uses:**
+
+- `credentials.get_credentials()` - retrieve credentials
+- `SourceFactory.create_adapter()` - get appropriate adapter
+- `adapter.login()` - authenticate (robin_stocks caches session)
+- `adapter.extract_transactions()` / `adapter.extract_positions()` - fetch data
+- `adapter.normalize_*()` - convert to unified models
+- `validate_*()` - validate data
+- `*Repository.create()` - store in database
+
+**Design Decisions:**
+
+- Broker-agnostic: uses `source` parameter for future IBKR, etc.
+- Fail fast: raise exceptions immediately on any error
+- Session management: let robin_stocks handle session caching
+- Simple orchestration: just tie existing components together
+
+**Future Enhancements:**
+
+- Additional sync functions: `sync_account()`, `sync_margin()`, `sync_all()`
+- Incremental sync (track last sync timestamp, only fetch new data)
+- Duplicate detection and conflict resolution
+- Progress reporting for large syncs
 
 ______________________________________________________________________
 
-## Phase 3: Data Sync & Updates
+## Phase 3: Simple CLI Interface ← NEXT
 
-### 3.1 Incremental Sync
+**Focus:** Build minimal CLI for testing and validating the application layer. Keep it simple - just enough to login, sync data, and view it.
 
-**File:** `src/sync/syncer.py`
+**Structure:** Single project with library + CLI
+
+- Library: `src/tradedata/` (importable by other projects)
+- CLI: `cli/main.py` (thin wrapper, uses library)
+- Future interfaces (MCP, web, API) can be added in same repo or extracted later
+
+**File:** `cli/main.py`
+
+**Commands:**
+
+```bash
+# Initial setup (one time, or when session expires)
+uv run tradedata login robinhood
+# → Prompts for email and password
+# → Stores in keyring via credentials.store_credentials()
+# → Calls robin_stocks.login() to establish session
+# → robin_stocks prompts for SMS code and device approval
+# → Session cached - subsequent commands reuse it until expiration
+
+# Sync data from API → store in local database
+uv run tradedata sync transactions [--start-date YYYY-MM-DD] [--end-date YYYY-MM-DD]
+# → Calls robinhood_sync.sync_transactions()
+# → Uses cached session (no MFA prompt unless expired)
+
+uv run tradedata sync positions
+# → Calls robinhood_sync.sync_positions()
+
+# Query data from local database
+uv run tradedata list transactions [--type stock|option] [--days N]
+# → Queries TransactionRepository directly
+# → Displays formatted results
+
+uv run tradedata list positions
+# → Queries PositionRepository directly
+
+# Future commands
+uv run tradedata sync account    # Account details
+uv run tradedata sync margin     # Margin info
+uv run tradedata sync all        # Everything
+```
+
+**Implementation:**
+
+- Use `click` library for CLI framework
+- Thin wrapper - just parse args and call application layer
+- Application layer does all orchestration
+- CLI only handles: arg parsing, user prompts, output formatting
+
+**Success Criteria:**
+
+- Can login and store credentials securely
+- Can sync transactions and positions
+- Can query and view local data
+- All interfaces share same application layer code
+
+______________________________________________________________________
+
+## Phase 4: Data Sync & Updates
+
+**Focus:** Incremental sync, deduplication, and intelligent updates
+
+### 4.1 Incremental Sync
+
+**File:** `src/tradedata/application/incremental_sync.py`
 
 - Track last sync timestamp per data source
 - Only fetch new/updated transactions since last sync
@@ -489,9 +581,9 @@ ______________________________________________________________________
 - Detect and resolve conflicts (same transaction from multiple sources)
 - **Note:** Sync and enrichment are separate operations. Sync fetches raw data, enrichment happens separately.
 
-### 3.2 Position Updates
+### 4.2 Position Updates
 
-**File:** `src/positions/tracker.py`
+**File:** `src/tradedata/application/position_tracking.py`
 
 - Fetch current positions from sources
 - Update position table
@@ -500,11 +592,13 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## Phase 4: Data Export & APIs
+## Phase 5: Data Export & APIs
 
-### 4.1 Export Functions
+**Focus:** Export data in various formats and provide query APIs for other tools
 
-**File:** `src/export/exporters.py`
+### 5.1 Export Functions
+
+**File:** `src/tradedata/export/exporters.py`
 
 **Export Formats:**
 
@@ -519,9 +613,9 @@ ______________________________________________________________________
 - Include/exclude enriched data
 - Include/exclude raw data
 
-### 4.2 Transaction Linking
+### 5.2 Transaction Linking
 
-**File:** `src/linking/linker.py`
+**File:** `src/tradedata/linking/linker.py`
 
 **Purpose:** Provide basic transaction linking (entries → exits) to make data analytics-ready.
 
@@ -559,9 +653,9 @@ ______________________________________________________________________
 - Multi-leg spread detection
 - Custom linking rules
 
-### 4.3 Query API
+### 5.3 Query API
 
-**File:** `src/api/query.py`
+**File:** `src/tradedata/api/query.py`
 
 **Functions:**
 
@@ -579,40 +673,81 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## Phase 5: CLI Interface
+## Phase 6: Data Enrichment
 
-### 5.1 CLI Commands
+**Focus:** Add historical market data enrichment for analytics (Greeks, IV, technical indicators at trade time)
 
-**File:** `src/cli/main.py`
+**⚠️ Important:** Enrichment strategy validation is in progress. See `../rhscrape/docs/ENRICHMENT_CONSTRAINTS.md` for current status. The `enriched_data` schema may need adjustment based on API availability validation.
 
-**Commands:**
+### 6.1 Enrichment Pipeline
 
-- `tradedata sync [source]` - Sync data from source(s) (separate from enrichment)
-- `tradedata enrich [--transaction-id]` - Enrich transactions (explicit, separate from sync)
-- `tradedata link` - Link related transactions (entries → exits)
-- `tradedata query [filters]` - Query transactions
-- `tradedata export [format] [--output]` - Export data
-- `tradedata validate` - Validate data integrity
-- `tradedata status` - Show sync status, data counts
+**File:** `src/enrichment/enricher.py`
 
-**Example Usage:**
+**Enrichment Process:**
 
-```bash
-# Sync from Robinhood (separate step)
-tradedata sync robinhood
+1. Identify transactions that need enrichment (options, stocks)
 
-# Enrich all option transactions (separate step, explicit)
-tradedata enrich --type option
+1. For each transaction, fetch market data at exact timestamp:
 
-# Link related transactions (optional, separate step)
-tradedata link
+   ```
+        - Option chain data → Greeks, IV (source TBD: Massive/Theta Data API vs Black-Scholes computation)
+        - Historical stock data → Technical indicators
+   ```
 
-# Query recent option trades
-tradedata query --type option --days 30
+1. Store enriched data in `enriched_data` table:
 
-# Export to CSV
-tradedata export csv --output trades.csv --include-enriched
-```
+   - Store computed results (Greeks, IV, technicals)
+   - Store intermediate inputs (underlying_price, volatility, risk_free_rate) for recomputation support
+   - Track enrichment method and version for re-enrichment support
+
+1. **Error Handling:** Fail loud, hard, and fast. No graceful error handling during initial development. If enrichment fails, raise exception immediately.
+
+**Enrichment Strategy Validation Required:**
+
+- Validate Massive/Theta Data APIs for historical Greeks (see ENRICHMENT_CONSTRAINTS.md)
+- If APIs unavailable, implement Black-Scholes computation fallback
+- Schema design should accommodate both approaches
+
+**Enrichment Sources:**
+
+- Option Greeks: `robin_stocks.options.get_option_market_data()`
+- Historical stock data: `robin_stocks.stocks.get_historicals()`
+- Technical indicators: Calculate from historical data (pandas-ta or ta-lib)
+
+### 6.2 Greeks Fetcher
+
+**File:** `src/enrichment/greeks.py`
+
+**⚠️ Strategy TBD:** Greeks source depends on API validation (see ENRICHMENT_CONSTRAINTS.md):
+
+- **Option A (if APIs available):** Fetch from Massive/Theta Data APIs at specific timestamp
+- **Option B (fallback):** Compute via Black-Scholes using historical volatility
+- **Current Status:** API validation in progress
+
+**Implementation:**
+
+- Fetch/compute option Greeks (delta, gamma, theta, vega) for exact contract at trade timestamp
+- Store intermediate inputs (underlying_price, volatility, risk_free_rate) for recomputation
+- Track enrichment method (`enrichment_method` field) to indicate data source
+- **Error Handling:** If historical data unavailable, raise exception (fail fast)
+- Cache results to avoid re-fetching
+- **Re-enrichment:** Allow re-enriching transactions (overwrite existing enriched data) - useful if we add new indicators, improve enrichment logic, or switch data sources
+
+### 6.3 Technical Indicators
+
+**File:** `src/enrichment/technicals.py`
+
+- Calculate RSI, MACD, EMA, etc. from historical price data
+- Support multiple timeframes (1min, 5min, daily, etc.)
+- Store indicators at trade timestamp
+
+### 6.4 IV Fetcher
+
+**File:** `src/enrichment/iv.py`
+
+- Extract implied volatility from option chain data
+- Calculate IV rank/percentile if possible
+- Store IV at trade timestamp
 
 ______________________________________________________________________
 
@@ -624,6 +759,7 @@ ______________________________________________________________________
 - SQLite for storage (can migrate to PostgreSQL later if needed)
 - `pandas` for data manipulation
 - `click` for CLI
+- `keyring` for secure credential storage
 
 **Package Management:**
 
@@ -660,52 +796,66 @@ ______________________________________________________________________
 
 ```
 tradedata/
-├── src/
-│   ├── data/
+├── src/tradedata/                # Core library (importable)
+│   ├── __init__.py               # Public API exports
+│   ├── data/                     # Domain + Infrastructure
 │   │   ├── __init__.py
-│   │   ├── schema.py           # Database schema
-│   │   ├── models.py            # Python data models (dataclasses/Pydantic)
-│   │   ├── normalize.py         # Normalization logic
-│   │   ├── storage.py           # SQLite operations (low-level)
-│   │   ├── repository.py        # Repository pattern for data access
-│   │   └── validator.py          # Data validation
-│   ├── sources/
+│   │   ├── schema.py             # Database schema
+│   │   ├── models.py             # Python data models (dataclasses)
+│   │   ├── storage.py            # SQLite operations (low-level)
+│   │   ├── validator.py          # Data validation
+│   │   └── repositories/         # Repository pattern
+│   │       ├── __init__.py
+│   │       ├── base.py
+│   │       ├── transaction.py
+│   │       ├── position.py
+│   │       └── ...
+│   ├── sources/                  # Infrastructure (External APIs)
 │   │   ├── __init__.py
-│   │   ├── base.py              # Abstract base class
-│   │   ├── robinhood.py         # Robinhood adapter
-│   │   └── factory.py           # Source factory
-│   ├── enrichment/
+│   │   ├── base.py               # Abstract base class
+│   │   ├── robinhood.py          # Robinhood adapter
+│   │   └── factory.py            # Source factory
+│   ├── application/              # Application Layer (NEW - Phase 2)
 │   │   ├── __init__.py
-│   │   ├── enricher.py          # Main enrichment pipeline
-│   │   ├── greeks.py            # Fetch Greeks
-│   │   ├── technicals.py        # Calculate technicals
-│   │   └── iv.py                # Fetch IV
-│   ├── sync/
+│   │   ├── credentials.py        # Keyring credential management
+│   │   └── robinhood_sync.py     # Sync orchestration
+│   ├── enrichment/               # Phase 6 (future)
 │   │   ├── __init__.py
-│   │   └── syncer.py            # Sync logic
-│   ├── positions/
+│   │   ├── enricher.py
+│   │   ├── greeks.py
+│   │   ├── technicals.py
+│   │   └── iv.py
+│   ├── linking/                  # Phase 5 (future)
 │   │   ├── __init__.py
-│   │   └── tracker.py           # Position tracking
-│   ├── linking/
-│   │   ├── __init__.py
-│   │   └── linker.py            # Transaction linking
-│   ├── export/
-│   │   ├── __init__.py
-│   │   └── exporters.py         # Export functions
-│   ├── api/
-│   │   ├── __init__.py
-│   │   └── query.py             # Query API
-│   └── cli/
+│   │   └── linker.py
+│   └── export/                   # Phase 5 (future)
 │       ├── __init__.py
-│       └── main.py              # CLI interface
-├── data/
-│   └── trading.db               # SQLite database
-├── config/
-│   └── sources.yaml              # Data source configuration
+│       └── exporters.py
+│
+├── cli/                          # CLI Interface (Phase 3)
+│   ├── __init__.py
+│   └── main.py                   # CLI commands (thin wrapper)
+│
+├── mcp/                          # MCP Server (future)
+│   └── server.py
+│
+├── api/                          # Backend API (future)
+│   └── app.py
+│
+├── web/                          # Web interface (future)
+│   └── app.py
+│
+├── tests/                        # Test suite
+│   ├── unit/
+│   ├── integration/
+│   └── fixtures/
+│
 ├── pyproject.toml                # Project config and dependencies (uv)
 ├── README.md
-└── .env.example
+└── .gitignore
 ```
+
+**Note:** Library code in `src/tradedata/` is importable. Interfaces (CLI, MCP, API, web) are separate and use the library.
 
 ______________________________________________________________________
 
