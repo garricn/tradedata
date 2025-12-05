@@ -7,11 +7,12 @@ Designed to be broker-agnostic via the `source` parameter.
 from typing import List, Optional
 
 from tradedata.application import credentials
-from tradedata.data.models import Transaction
+from tradedata.data.models import Position, Transaction
 from tradedata.data.repositories import (
     ExecutionRepository,
     OptionLegRepository,
     OptionOrderRepository,
+    PositionRepository,
     StockOrderRepository,
     TransactionRepository,
 )
@@ -20,6 +21,7 @@ from tradedata.data.validator import (
     validate_execution,
     validate_option_leg,
     validate_option_order,
+    validate_position,
     validate_stock_order,
     validate_transaction,
 )
@@ -118,3 +120,52 @@ def sync_transactions(
                 stock_repo.create(stock_order)
 
     return stored_transactions
+
+
+def sync_positions(
+    source: str = "robinhood",
+    storage: Optional[Storage] = None,
+    adapter=None,
+) -> List[Position]:
+    """Sync positions from a source into storage.
+
+    Workflow:
+    1. Retrieve credentials from keyring
+    2. Create adapter (or use injected adapter)
+    3. Login via adapter
+    4. Extract raw positions
+    5. Normalize, validate, and persist positions
+
+    Args:
+        source: Data source name (default: 'robinhood')
+        storage: Optional Storage instance (defaults to configured database)
+        adapter: Optional adapter instance (for testing or custom sources)
+
+    Returns:
+        List of stored Position models.
+
+    Raises:
+        CredentialsNotFoundError: When credentials are not in keyring.
+        ValidationError: When any model fails validation.
+        AttributeError: When adapter cannot perform login.
+        Exception: Propagates any adapter or storage errors.
+    """
+    username, password = credentials.get_credentials(source)
+
+    adapter = adapter or create_adapter(source)
+    _login_adapter(adapter, username, password)
+
+    raw_positions = adapter.extract_positions()
+
+    storage = storage or Storage()
+    position_repo = PositionRepository(storage)
+
+    stored_positions: list[Position] = []
+
+    for raw_pos in raw_positions:
+        position = adapter.normalize_position(raw_pos)
+        validate_position(position)
+        position_repo.create(position)
+        stored_positions.append(position)
+
+    return stored_positions
