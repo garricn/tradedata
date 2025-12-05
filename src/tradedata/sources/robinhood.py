@@ -501,6 +501,8 @@ class RobinhoodAdapter(DataSourceAdapter):
 
         # Extract stock order fields
         symbol = raw_transaction.get("symbol", "")
+        if not symbol:
+            raise ValueError("Stock order is missing symbol")
         side = raw_transaction.get("side", "").lower()
         quantity = self._safe_float(raw_transaction.get("quantity", 0)) or 0.0
         price = self._safe_float(raw_transaction.get("price")) or 0.0

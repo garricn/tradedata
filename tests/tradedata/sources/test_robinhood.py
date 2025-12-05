@@ -3,6 +3,8 @@
 import json
 from unittest.mock import MagicMock
 
+import pytest
+
 from tradedata.sources.robinhood import RobinhoodAdapter
 
 
@@ -233,6 +235,23 @@ class TestRobinhoodAdapter:
         assert stock_order.quantity == 10.0
         assert stock_order.price == 150.0
         assert stock_order.average_price == 150.5
+
+    def test_extract_stock_order_missing_symbol_raises(self):
+        """StockOrder extraction should fail when symbol is missing."""
+        raw_tx = {
+            "id": "rh-stock-123",
+            "side": "buy",
+            "quantity": "10.0",
+            "price": "150.0",
+            "average_price": "150.5",
+        }
+
+        mock_rh = MagicMock()
+        adapter = RobinhoodAdapter(robin_stocks=mock_rh)
+        transaction = adapter.normalize_transaction(raw_tx)
+
+        with pytest.raises(ValueError):
+            adapter.extract_stock_order(raw_tx, transaction.id)
 
     def test_normalize_position(self):
         """Test normalizing a position."""
