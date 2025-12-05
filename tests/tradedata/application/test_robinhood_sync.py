@@ -7,11 +7,19 @@ from unittest.mock import MagicMock
 import pytest
 
 from tradedata.application import robinhood_sync
-from tradedata.data.models import Execution, OptionLeg, OptionOrder, StockOrder, Transaction
+from tradedata.data.models import (
+    Execution,
+    OptionLeg,
+    OptionOrder,
+    Position,
+    StockOrder,
+    Transaction,
+)
 from tradedata.data.repositories import (
     ExecutionRepository,
     OptionLegRepository,
     OptionOrderRepository,
+    PositionRepository,
     StockOrderRepository,
     TransactionRepository,
 )
@@ -214,3 +222,116 @@ def test_sync_transactions_raises_on_validation_failure(monkeypatch):
         robinhood_sync.sync_transactions(storage=storage, adapter=bad_adapter)
 
     assert TransactionRepository(storage).find_all() == []
+
+
+class FakePositionAdapter:
+    """Fake adapter for position sync flow."""
+
+    def __init__(self):
+        self.logged_in = False
+        self.raw_positions = [
+            {
+                "symbol": "AAPL",
+                "quantity": "10.0",
+                "cost_basis": "150.0",
+                "current_price": "155.0",
+                "unrealized_pnl": "50.0",
+                "last_updated": "2025-02-01T00:00:00Z",
+            },
+            {
+                "symbol": "MSFT",
+                "quantity": "5.0",
+                "cost_basis": "320.0",
+                "current_price": "330.0",
+                "unrealized_pnl": "50.0",
+                "last_updated": "2025-02-02T00:00:00Z",
+            },
+        ]
+
+    def login(self, username: str, password: str) -> None:
+        self.logged_in = True
+        self.login_args = (username, password)
+
+    def extract_positions(self):
+        return self.raw_positions
+
+    def normalize_position(self, raw_position):
+        return Position(
+            id=str(uuid.uuid4()),
+            source="robinhood",
+            symbol=raw_position["symbol"],
+            quantity=float(raw_position["quantity"]),
+            cost_basis=float(raw_position["cost_basis"]),
+            current_price=float(raw_position["current_price"]),
+            unrealized_pnl=float(raw_position["unrealized_pnl"]),
+            last_updated=raw_position["last_updated"],
+        )
+
+
+def test_sync_positions_persists_positions(monkeypatch):
+    """Sync positions end-to-end into storage."""
+    storage = Storage(db_path=":memory:")
+    adapter = FakePositionAdapter()
+    monkeypatch.setattr(
+        robinhood_sync.credentials,
+        "get_credentials",
+        lambda source: ("user", "pw"),
+    )
+
+    stored = robinhood_sync.sync_positions(storage=storage, adapter=adapter)
+
+    assert adapter.logged_in
+    assert len(stored) == len(adapter.raw_positions)
+
+    repo = PositionRepository(storage)
+    positions = repo.find_all()
+    assert len(positions) == len(adapter.raw_positions)
+    symbols = {p.symbol for p in positions}
+    assert symbols == {"AAPL", "MSFT"}
+
+
+def test_sync_positions_uses_factory_when_adapter_not_provided(monkeypatch):
+    """Ensure factory creation and login are invoked for positions."""
+    mock_adapter = MagicMock()
+    mock_adapter.extract_positions.return_value = []
+
+    def mock_get_credentials(source):
+        return ("user", "pw")
+
+    monkeypatch.setattr(robinhood_sync, "create_adapter", MagicMock(return_value=mock_adapter))
+    monkeypatch.setattr(robinhood_sync.credentials, "get_credentials", mock_get_credentials)
+
+    storage = Storage(db_path=":memory:")
+    robinhood_sync.sync_positions(source="robinhood", storage=storage)
+
+    robinhood_sync.create_adapter.assert_called_once_with("robinhood")
+    mock_adapter.login.assert_called_once_with("user", "pw")
+    mock_adapter.extract_positions.assert_called_once_with()
+
+
+def test_sync_positions_raises_on_validation_failure(monkeypatch):
+    """Fail fast when position validation errors occur."""
+    bad_adapter = MagicMock()
+    bad_adapter.extract_positions.return_value = [{"symbol": "bad"}]
+    bad_adapter.normalize_position.return_value = Position(
+        id=str(uuid.uuid4()),
+        source="robinhood",
+        symbol="bad",
+        quantity=1.0,
+        cost_basis=None,
+        current_price=None,
+        unrealized_pnl=None,
+        last_updated="2025-02-01T00:00:00Z",
+    )
+
+    monkeypatch.setattr(robinhood_sync.credentials, "get_credentials", lambda source: ("u", "p"))
+    monkeypatch.setattr(
+        robinhood_sync, "validate_position", MagicMock(side_effect=ValidationError("boom"))
+    )
+
+    storage = Storage(db_path=":memory:")
+
+    with pytest.raises(ValidationError):
+        robinhood_sync.sync_positions(storage=storage, adapter=bad_adapter)
+
+    assert PositionRepository(storage).find_all() == []
