@@ -4,7 +4,7 @@ from typing import Optional
 
 import click
 
-from tradedata.application import credentials
+from tradedata.application import CredentialsNotFoundError, credentials
 from tradedata.sources import create_adapter
 
 
@@ -16,15 +16,28 @@ from tradedata.sources import create_adapter
     help="Account password; prompts if not provided.",
     hide_input=True,
 )
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    help="Re-prompt and overwrite stored credentials even if found in keyring.",
+)
 def login(
     source: str,
     email: Optional[str] = None,
     password: Optional[str] = None,
+    force: bool = False,
 ) -> None:
     """Login to a data source and store credentials securely."""
 
-    email_value = email or click.prompt("Email")
-    password_value = password or click.prompt("Password", hide_input=True)
+    try:
+        email_value, password_value = credentials.resolve_credentials(
+            source, email=email, password=password, force=force
+        )
+    except CredentialsNotFoundError:
+        # Prompt for any missing pieces
+        email_value = email or click.prompt("Email")
+        password_value = password or click.prompt("Password", hide_input=True)
 
     try:
         # Attempt login (adapters handle session/MFA flows)
