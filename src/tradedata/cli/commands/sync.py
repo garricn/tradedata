@@ -1,5 +1,7 @@
 """Sync commands for transactions and positions."""
 
+from typing import Optional
+
 import click
 
 from tradedata.application import robinhood_sync
@@ -15,7 +17,7 @@ def sync() -> None:
 @click.option("--start-date", help="Optional start date (YYYY-MM-DD).")
 @click.option("--end-date", help="Optional end date (YYYY-MM-DD).")
 def sync_transactions(
-    source: str, start_date: str | None = None, end_date: str | None = None
+    source: str, start_date: Optional[str] = None, end_date: Optional[str] = None
 ) -> None:
     """Sync transactions into the local database."""
     transactions = robinhood_sync.sync_transactions(
