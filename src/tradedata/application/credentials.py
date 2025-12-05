@@ -109,12 +109,6 @@ def delete_credentials(source: str) -> None:
         # Credential didn't exist, that's fine
         pass
 
-    try:
-        keyring.delete_password(service_name, f"{source}_password")
-    except keyring.errors.PasswordDeleteError:
-        # Credential didn't exist, that's fine
-        pass
-
 
 def resolve_credentials(
     source: str = "robinhood",
