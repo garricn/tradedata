@@ -30,22 +30,14 @@ def login(
 ) -> None:
     """Login to a data source and store credentials securely."""
 
-    email_value = email
-    password_value = password
-
-    if not force and not email_value and not password_value:
-        try:
-            stored_email, stored_password = credentials.get_credentials(source)
-            email_value = stored_email
-            password_value = stored_password
-        except CredentialsNotFoundError:
-            # No stored credentials; will prompt below
-            pass
-
-    if email_value is None:
-        email_value = click.prompt("Email")
-    if password_value is None:
-        password_value = click.prompt("Password", hide_input=True)
+    try:
+        email_value, password_value = credentials.resolve_credentials(
+            source, email=email, password=password, force=force
+        )
+    except CredentialsNotFoundError:
+        # Prompt for any missing pieces
+        email_value = email or click.prompt("Email")
+        password_value = password or click.prompt("Password", hide_input=True)
 
     try:
         # Attempt login (adapters handle session/MFA flows)

@@ -7,7 +7,7 @@ Secret Service).
 Following the pattern from perfina project for consistent credential management.
 """
 
-from typing import Tuple
+from typing import Optional, Tuple
 
 import keyring
 
@@ -108,3 +108,54 @@ def delete_credentials(source: str) -> None:
     except keyring.errors.PasswordDeleteError:
         # Credential didn't exist, that's fine
         pass
+
+    try:
+        keyring.delete_password(service_name, f"{source}_password")
+    except keyring.errors.PasswordDeleteError:
+        # Credential didn't exist, that's fine
+        pass
+
+
+def resolve_credentials(
+    source: str = "robinhood",
+    email: Optional[str] = None,
+    password: Optional[str] = None,
+    force: bool = False,
+) -> Tuple[str, str]:
+    """Resolve credentials from provided values or keyring.
+
+    Resolution order:
+    1. If both email and password are provided, use them.
+    2. If not force and any value is missing, attempt keyring lookup.
+    3. If still missing, raise CredentialsNotFoundError.
+
+    Args:
+        source: Data source name.
+        email: Optional email override.
+        password: Optional password override.
+        force: If True, skip keyring lookup and require provided values.
+
+    Returns:
+        Tuple of (email, password).
+
+    Raises:
+        CredentialsNotFoundError: If credentials are not provided or stored.
+    """
+    email_value = email
+    password_value = password
+
+    if not force and (email_value is None or password_value is None):
+        try:
+            stored_email, stored_password = get_credentials(source)
+            email_value = email_value or stored_email
+            password_value = password_value or stored_password
+        except CredentialsNotFoundError:
+            # No stored credentials; fall through to validation
+            pass
+
+    if email_value is None or password_value is None:
+        raise CredentialsNotFoundError(
+            f"Credentials for '{source}' not found in keyring and not provided."
+        )
+
+    return email_value, password_value
