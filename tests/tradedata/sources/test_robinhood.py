@@ -32,9 +32,11 @@ class TestRobinhoodAdapter:
         mock_rh.get_all_stock_orders.return_value = [
             {"id": "stock-1", "symbol": "AAPL", "created_at": "2025-01-01T10:00:00Z"},
         ]
-        mock_rh.get_all_option_orders.return_value = [
+        mock_rh.orders.get_all_option_orders.return_value = [
             {"id": "option-1", "legs": [], "created_at": "2025-01-02T10:00:00Z"},
         ]
+        # Ensure no top-level option orders function
+        mock_rh.get_all_option_orders = None
 
         adapter = RobinhoodAdapter(robin_stocks=mock_rh)
         transactions = adapter.extract_transactions()
@@ -43,7 +45,24 @@ class TestRobinhoodAdapter:
         assert transactions[0]["id"] == "stock-1"
         assert transactions[1]["id"] == "option-1"
         mock_rh.get_all_stock_orders.assert_called_once()
-        mock_rh.get_all_option_orders.assert_called_once()
+        mock_rh.orders.get_all_option_orders.assert_called_once()
+
+    def test_extract_transactions_orders_fallback(self):
+        """Test option orders fetched via orders submodule when options is missing."""
+        mock_rh = MagicMock()
+        mock_rh.get_all_stock_orders.return_value = []
+        mock_rh.orders.get_all_option_orders.return_value = [
+            {"id": "option-1", "legs": [], "created_at": "2025-01-02T10:00:00Z"},
+        ]
+        # Remove options attribute to force fallback
+        mock_rh.options = None
+
+        adapter = RobinhoodAdapter(robin_stocks=mock_rh)
+        transactions = adapter.extract_transactions()
+
+        assert len(transactions) == 1
+        assert transactions[0]["id"] == "option-1"
+        mock_rh.orders.get_all_option_orders.assert_called_once()
 
     def test_extract_transactions_with_date_filter(self):
         """Test extracting transactions with date filtering."""

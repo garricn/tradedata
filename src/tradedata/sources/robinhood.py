@@ -50,7 +50,13 @@ class RobinhoodAPIWrapper:
 
     def get_all_option_orders(self) -> list[dict[str, Any]]:
         """Get all option orders via options.get_all_option_orders()."""
-        return self.rh.options.get_all_option_orders() or []  # type: ignore[no-any-return]
+        # robin_stocks exposes option order retrieval under either options or orders
+        if hasattr(self.rh, "options") and hasattr(self.rh.options, "get_all_option_orders"):
+            return self.rh.options.get_all_option_orders() or []  # type: ignore[no-any-return]
+        if hasattr(self.rh, "orders") and hasattr(self.rh.orders, "get_all_option_orders"):
+            return self.rh.orders.get_all_option_orders() or []  # type: ignore[no-any-return]
+
+        raise AttributeError("Robinhood API does not expose get_all_option_orders")
 
     def get_open_stock_positions(self) -> list[dict[str, Any]]:
         """Get open stock positions via stocks.get_all_stock_positions()."""
@@ -183,7 +189,13 @@ class RobinhoodAdapter(DataSourceAdapter):
             transactions.extend(stock_orders)
 
         # Get option orders - fail hard if API call fails
-        option_orders = self.rh.get_all_option_orders()
+        option_orders = []
+        if hasattr(self.rh, "orders") and hasattr(self.rh.orders, "get_all_option_orders"):
+            option_orders = self.rh.orders.get_all_option_orders()
+        elif hasattr(self.rh, "options") and hasattr(self.rh.options, "get_all_option_orders"):
+            option_orders = self.rh.options.get_all_option_orders()
+        elif hasattr(self.rh, "get_all_option_orders"):
+            option_orders = self.rh.get_all_option_orders()
         if option_orders:
             transactions.extend(option_orders)
 
