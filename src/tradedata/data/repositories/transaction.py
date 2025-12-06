@@ -9,6 +9,16 @@ from tradedata.data.repositories.base import BaseRepository
 class TransactionRepository(BaseRepository[Transaction]):
     """Repository for Transaction entities."""
 
+    def exists_by_source_id(self, source: str, source_id: str) -> bool:
+        """Check if a transaction exists for a given source/source_id."""
+        row = self.storage.fetchone(
+            """
+            SELECT 1 FROM transactions WHERE source = ? AND source_id = ? LIMIT 1
+            """,
+            (source, source_id),
+        )
+        return row is not None
+
     def get_by_id(self, entity_id: str) -> Optional[Transaction]:
         """Get transaction by ID."""
         row = self.storage.fetchone(

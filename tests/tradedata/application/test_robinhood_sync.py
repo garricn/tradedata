@@ -224,6 +224,62 @@ def test_sync_transactions_raises_on_validation_failure(monkeypatch):
     assert TransactionRepository(storage).find_all() == []
 
 
+def test_sync_transactions_skips_existing(monkeypatch):
+    """Skip inserting duplicate source/source_id instead of raising."""
+    storage = Storage(db_path=":memory:")
+    tx_repo = TransactionRepository(storage)
+
+    existing = Transaction(
+        id="existing-id",
+        source="robinhood",
+        source_id="rh-1",
+        type="stock",
+        created_at="2025-01-01T00:00:00Z",
+        account_id=None,
+        raw_data="{}",
+    )
+    tx_repo.create(existing)
+
+    class Adapter:
+        def login(self, username, password):
+            return None
+
+        def extract_transactions(self, start_date=None, end_date=None):
+            return [{"id": "rh-1", "created_at": "2025-01-01T00:00:00Z"}]
+
+        def normalize_transaction(self, raw_transaction):
+            return Transaction(
+                id=str(uuid.uuid4()),
+                source="robinhood",
+                source_id="rh-1",
+                type="stock",
+                created_at=raw_transaction["created_at"],
+                account_id=None,
+                raw_data="{}",
+            )
+
+        def extract_option_order(self, raw_tx, transaction_id):
+            return None
+
+        def extract_stock_order(self, raw_tx, transaction_id):
+            return None
+
+        def extract_option_legs(self, raw_tx, order_id):
+            return []
+
+        def extract_executions(self, raw_tx, transaction_id, leg_ids=None):
+            return []
+
+    monkeypatch.setattr(
+        "tradedata.application.credentials.get_credentials", lambda source: ("u", "p")
+    )
+
+    stored = robinhood_sync.sync_transactions(storage=storage, adapter=Adapter())
+
+    assert stored == []
+    assert len(tx_repo.find_all()) == 1
+
+
 class FakePositionAdapter:
     """Fake adapter for position sync flow."""
 

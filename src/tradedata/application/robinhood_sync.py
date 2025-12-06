@@ -95,6 +95,8 @@ def sync_transactions(
     for raw_tx in raw_transactions:
         transaction = adapter.normalize_transaction(raw_tx)
         validate_transaction(transaction)
+        if tx_repo.exists_by_source_id(transaction.source, transaction.source_id):
+            continue
         tx_repo.create(transaction)
         stored_transactions.append(transaction)
 
