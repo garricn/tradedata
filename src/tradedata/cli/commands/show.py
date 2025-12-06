@@ -1,6 +1,6 @@
 """Show commands for transactions and positions."""
 
-from typing import Iterable
+from typing import Iterable, Optional
 
 import click
 from rich import box
@@ -47,7 +47,7 @@ def show() -> None:
     type=int,
     help="Only include transactions from the past N days.",
 )
-def show_transactions(transaction_type: str | None, days: int | None) -> None:
+def show_transactions(transaction_type: Optional[str], days: Optional[int]) -> None:
     """Show stored transactions with optional filters."""
     transactions = listing.list_transactions(transaction_type=transaction_type, days=days)
     if not transactions:
