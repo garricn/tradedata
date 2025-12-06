@@ -40,51 +40,107 @@ class RobinhoodAPIWrapper:
         """
         self.rh = rh_module
 
+        def _resolve_callable(candidates: list[tuple[str, Any]], label: str):
+            for name, getter in candidates:
+                try:
+                    fn = getter()
+                except AttributeError:
+                    continue
+                if callable(fn):
+                    return fn
+            raise AttributeError(
+                f"robin_stocks missing required API for {label}. "
+                f"Expected one of: {[name for name, _ in candidates]}"
+            )
+
+        self._get_stock_orders = _resolve_callable(
+            [
+                (
+                    "orders.get_all_stock_orders",
+                    lambda: getattr(getattr(self.rh, "orders", None), "get_all_stock_orders", None),
+                ),
+                ("get_all_stock_orders", lambda: getattr(self.rh, "get_all_stock_orders", None)),
+            ],
+            "stock orders",
+        )
+        self._get_option_orders = _resolve_callable(
+            [
+                (
+                    "options.get_all_option_orders",
+                    lambda: getattr(
+                        getattr(self.rh, "options", None), "get_all_option_orders", None
+                    ),
+                ),
+                ("get_all_option_orders", lambda: getattr(self.rh, "get_all_option_orders", None)),
+            ],
+            "option orders",
+        )
+        self._get_stock_positions = _resolve_callable(
+            [
+                (
+                    "stocks.get_all_stock_positions",
+                    lambda: getattr(
+                        getattr(self.rh, "stocks", None), "get_all_stock_positions", None
+                    ),
+                ),
+                (
+                    "get_open_stock_positions",
+                    lambda: getattr(self.rh, "get_open_stock_positions", None),
+                ),
+                ("get_all_positions", lambda: getattr(self.rh, "get_all_positions", None)),
+            ],
+            "stock positions",
+        )
+        self._get_option_positions = _resolve_callable(
+            [
+                (
+                    "options.get_all_option_positions",
+                    lambda: getattr(
+                        getattr(self.rh, "options", None), "get_all_option_positions", None
+                    ),
+                ),
+                (
+                    "get_open_option_positions",
+                    lambda: getattr(self.rh, "get_open_option_positions", None),
+                ),
+                ("get_all_positions", lambda: getattr(self.rh, "get_all_positions", None)),
+            ],
+            "option positions",
+        )
+        self._get_symbol_by_url = _resolve_callable(
+            [
+                (
+                    "stocks.get_symbol_by_url",
+                    lambda: getattr(getattr(self.rh, "stocks", None), "get_symbol_by_url", None),
+                ),
+                ("get_symbol_by_url", lambda: getattr(self.rh, "get_symbol_by_url", None)),
+            ],
+            "symbol resolution by instrument URL",
+        )
+
     def login(self, username: str, password: str) -> dict[str, Any]:
         """Login to Robinhood account."""
         return self.rh.login(username, password)  # type: ignore[no-any-return]
 
     def get_all_stock_orders(self) -> list[dict[str, Any]]:
         """Get all stock orders via orders.get_all_stock_orders()."""
-        return self.rh.orders.get_all_stock_orders() or []  # type: ignore[no-any-return]
+        return self._get_stock_orders() or []  # type: ignore[no-any-return]
 
     def get_all_option_orders(self) -> list[dict[str, Any]]:
         """Get all option orders via options.get_all_option_orders()."""
-        if hasattr(self.rh, "options") and hasattr(self.rh.options, "get_all_option_orders"):
-            return self.rh.options.get_all_option_orders() or []  # type: ignore[no-any-return]
-        if hasattr(self.rh, "get_all_option_orders"):
-            return self.rh.get_all_option_orders() or []  # type: ignore[no-any-return]
-        raise AttributeError("robin_stocks.robinhood options get_all_option_orders not available")
+        return self._get_option_orders() or []  # type: ignore[no-any-return]
 
     def get_open_stock_positions(self) -> list[dict[str, Any]]:
         """Get open stock positions via stocks.get_all_stock_positions()."""
-        if hasattr(self.rh, "stocks") and hasattr(self.rh.stocks, "get_all_stock_positions"):
-            return self.rh.stocks.get_all_stock_positions() or []  # type: ignore[no-any-return]
-        if hasattr(self.rh, "get_open_stock_positions"):
-            return self.rh.get_open_stock_positions() or []  # type: ignore[no-any-return]
-        if hasattr(self.rh, "get_all_positions"):
-            # Fall back to combined positions if stock-only endpoint missing
-            return self.rh.get_all_positions() or []  # type: ignore[no-any-return]
-        raise AttributeError("robin_stocks.robinhood stock positions API not available")
+        return self._get_stock_positions() or []  # type: ignore[no-any-return]
 
     def get_open_option_positions(self) -> list[dict[str, Any]]:
         """Get open option positions via options.get_all_option_positions()."""
-        if hasattr(self.rh, "options") and hasattr(self.rh.options, "get_all_option_positions"):
-            return self.rh.options.get_all_option_positions() or []  # type: ignore[no-any-return]
-        if hasattr(self.rh, "get_open_option_positions"):
-            return self.rh.get_open_option_positions() or []  # type: ignore[no-any-return]
-        if hasattr(self.rh, "get_all_positions"):
-            # Fall back to combined positions if option-only endpoint missing
-            return self.rh.get_all_positions() or []  # type: ignore[no-any-return]
-        raise AttributeError("robin_stocks.robinhood option positions API not available")
+        return self._get_option_positions() or []  # type: ignore[no-any-return]
 
     def get_symbol_by_url(self, instrument_url: str) -> Optional[str]:
         """Resolve symbol from instrument URL when provided by robin_stocks."""
-        if hasattr(self.rh, "stocks") and hasattr(self.rh.stocks, "get_symbol_by_url"):
-            return self.rh.stocks.get_symbol_by_url(instrument_url)  # type: ignore[no-any-return]
-        if hasattr(self.rh, "get_symbol_by_url"):
-            return self.rh.get_symbol_by_url(instrument_url)  # type: ignore[no-any-return]
-        return None
+        return self._get_symbol_by_url(instrument_url)  # type: ignore[no-any-return]
 
 
 class RobinhoodAPI(Protocol):
