@@ -38,18 +38,22 @@ def show() -> None:
 @show.command("transactions")
 @click.option(
     "--type",
-    "transaction_type",
-    type=click.Choice(["stock", "option"]),
-    help="Filter by transaction type.",
+    "transaction_types",
+    multiple=True,
+    help=(
+        "Filter by transaction types (repeatable or comma-separated, "
+        "e.g., --type stock,option or --type stock --type option)."
+    ),
 )
 @click.option(
     "--days",
     type=int,
     help="Only include transactions from the past N days.",
 )
-def show_transactions(transaction_type: Optional[str], days: Optional[int]) -> None:
+def show_transactions(transaction_types: tuple[str, ...], days: Optional[int]) -> None:
     """Show stored transactions with optional filters."""
-    transactions = listing.list_transactions(transaction_type=transaction_type, days=days)
+    tx_types = _parse_types_option(transaction_types)
+    transactions = listing.list_transactions(transaction_types=tx_types, days=days)
     if not transactions:
         click.echo("No transactions found.")
         return
@@ -91,3 +95,14 @@ def show_positions() -> None:
         rows,
     )
     click.echo(output)
+
+
+def _parse_types_option(types: Optional[tuple[str, ...]]) -> Optional[list[str]]:
+    """Flatten repeatable/CSV types into a list."""
+    if not types:
+        return None
+    flattened: list[str] = []
+    for entry in types:
+        parts = [part.strip() for part in entry.replace(",", " ").split() if part.strip()]
+        flattened.extend(parts)
+    return flattened or None

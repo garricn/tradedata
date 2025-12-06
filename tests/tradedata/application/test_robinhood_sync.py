@@ -171,6 +171,30 @@ def test_sync_transactions_persists_option_and_stock(monkeypatch):
     assert stock_repo.get_by_id(adapter.stock_tx_id) is not None
 
 
+def test_sync_transactions_filters_types(monkeypatch):
+    """Ensure type filtering skips non-matching transactions."""
+    storage = Storage(db_path=":memory:")
+    adapter = FakeAdapter()
+    monkeypatch.setattr(
+        robinhood_sync.credentials,
+        "get_credentials",
+        lambda source: ("user", "pw"),
+    )
+
+    stored = robinhood_sync.sync_transactions(
+        source="robinhood",
+        storage=storage,
+        adapter=adapter,
+        types=["stock"],
+    )
+
+    assert len(stored) == 1
+    assert stored[0].type == "stock"
+
+    tx_repo = TransactionRepository(storage)
+    assert len(tx_repo.find_all()) == 1
+
+
 def test_sync_transactions_uses_factory_when_adapter_not_provided(monkeypatch):
     """Ensure factory creation and login are invoked when adapter is omitted."""
     mock_adapter = MagicMock()

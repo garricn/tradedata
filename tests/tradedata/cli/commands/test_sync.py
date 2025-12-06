@@ -9,8 +9,8 @@ def test_sync_transactions_invokes_app(monkeypatch):
     """Ensure CLI calls app sync_transactions with options."""
     calls = {}
 
-    def fake_sync_transactions(source, start_date=None, end_date=None):
-        calls["sync_transactions"] = (source, start_date, end_date)
+    def fake_sync_transactions(source, start_date=None, end_date=None, types=None):
+        calls["sync_transactions"] = (source, start_date, end_date, types)
         return [{"id": "tx1"}, {"id": "tx2"}]
 
     monkeypatch.setattr(
@@ -30,11 +30,18 @@ def test_sync_transactions_invokes_app(monkeypatch):
             "2025-01-01",
             "--end-date",
             "2025-02-01",
+            "--types",
+            "stock,option",
         ],
     )
 
     assert result.exit_code == 0
-    assert calls["sync_transactions"] == ("robinhood", "2025-01-01", "2025-02-01")
+    assert calls["sync_transactions"] == (
+        "robinhood",
+        "2025-01-01",
+        "2025-02-01",
+        ["stock", "option"],
+    )
     assert "Synced 2 transactions" in result.output
 
 
