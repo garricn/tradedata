@@ -803,7 +803,7 @@ ______________________________________________________________________
 - Cache results to avoid re-fetching
 - **Re-enrichment:** Allow re-enriching transactions (overwrite existing enriched data) - useful if we add new indicators, improve enrichment logic, or switch data sources
 
-### 6.3 Technical Indicators
+### 7.3 Technical Indicators
 
 **File:** `src/enrichment/technicals.py`
 
@@ -811,7 +811,7 @@ ______________________________________________________________________
 - Support multiple timeframes (1min, 5min, daily, etc.)
 - Store indicators at trade timestamp
 
-### 6.4 IV Fetcher
+### 7.4 IV Fetcher
 
 **File:** `src/enrichment/iv.py`
 
