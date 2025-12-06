@@ -1,5 +1,6 @@
 """Show commands for transactions and positions."""
 
+import json
 from io import StringIO
 from typing import Iterable, Optional
 
@@ -132,15 +133,20 @@ def show_transactions(
             click.echo("No transactions found.")
             return
 
-        rows: list[list[str]] = []
         for tx in transactions:
-            rows.append([tx.id, tx.type, tx.source, tx.created_at, tx.source_id])
-
-        output = _table(
-            ["ID", "Type", "Source", "Created At", "Source ID"],
-            rows,
-        )
-        click.echo(output)
+            merged = {
+                "id": tx.id,
+                "source": tx.source,
+                "source_id": tx.source_id,
+                "type": tx.type,
+                "created_at": tx.created_at,
+                "account_id": tx.account_id,
+            }
+            raw_dict = tx.get_raw_data_dict()
+            for key, value in raw_dict.items():
+                merged[f"raw.{key}"] = value
+            click.echo(json.dumps(merged, indent=2, sort_keys=True))
+            click.echo()
         return
 
     tables = listing.list_enriched_transaction_tables(

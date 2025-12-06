@@ -196,8 +196,9 @@ def test_show_transactions_raw_flag(tmp_path) -> None:
 
     assert result.exit_code == 0
     output = result.output
-    assert "ID" in output
-    assert "Symbol" not in output
+    assert '"raw.symbol": "MSFT"' in output
+    assert '"type": "stock"' in output
+    assert '"id": "tx-stock"' in output
     assert "Stock transactions" not in output
 
 
