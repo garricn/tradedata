@@ -506,7 +506,7 @@ def sync_positions(source="robinhood"):
 
 ______________________________________________________________________
 
-## Phase 3: Simple CLI Interface ← NEXT
+## Phase 3: Simple CLI Interface ← COMPLETE
 
 **Focus:** Build minimal CLI for testing and validating the application layer. Keep it simple - just enough to login, sync data, and view it.
 
@@ -558,20 +558,89 @@ uv run tradedata sync all        # Everything
 - Application layer does all orchestration
 - CLI only handles: arg parsing, user prompts, output formatting
 
+**Extended (done):**
+
+- `sync transactions`/`show transactions` support type filters
+- Enriched, per-type tables for `show transactions` with `--raw` fallback
+- Type filters for both sync/show
+
+**Extended (moved to Phase 4):**
+
+- Full/raw payload visibility and per-transaction detail (issue #53)
+- Convenience queries (`--last N`, `--id/--source-id`)
+
+______________________________________________________________________
+
+## Phase 4: Complete Robinhood Data Capture (NEW)
+
+**Goal:** Ensure all Robinhood-sourced data is ingested, stored, and visible before deeper analytics.
+
+**Sub-phases:**
+
+- **4.1 Visibility & detail:** Full/raw payload visibility and per-transaction detail (issue #53), convenience queries (`--last/--id`), QA/audit command (counts, missing fields, latest timestamps), optional export (JSON/CSV).
+- **4.2 Positions enrichment:** Fetch quotes for `current_price`, derive/validate `cost_basis`, add `--open-only`, capture option/crypto positions if available.
+- **4.3 Orders & executions:** Fees/commissions/adjustments; order lifecycle (states, last transaction time, extended-hours flags); populate executions for stock orders (per-fill price/qty/timestamp); capture option assignments/exercises/expirations explicitly.
+- **4.4 Crypto/dividends/transfers extras:** Dedicated/richer crypto mapping (state changes, fees, executions); surface extra dividend/transfer fields (withholding/DRIP/ref ids/fees) in detail views.
+- **4.5 Accounts/metadata:** Account/portfolio snapshots (cash, buying power, margin balances/equity if exposed); instrument/fundamentals metadata (names/exchanges/sectors); tax lot selection (`tax_lot_selection_type` and selected lot details when available).
+
+**Scope:**
+
+- Fees/commissions/adjustments: persist on orders/executions where present.
+- Order lifecycle: states (filled/partial/canceled/rejected), last transaction time, extended-hours flags.
+- Stock executions: store per-fill price/qty/timestamp.
+- Option assignments/exercises/expirations: capture explicitly if surfaced; avoid hiding them in raw only.
+- Crypto: consider a dedicated table; store state changes, fees, executions.
+- Dividends/transfers: surface extra fields (withholding/DRIP/ref ids/fees) from raw.
+- Positions enrichment: fetch quotes for `current_price`; derive/validate `cost_basis`; capture option/crypto positions if available; add `--open-only` view.
+- Account/portfolio snapshots: cash, buying power, margin balances/equity if API exposes them.
+- Instrument/fundamentals metadata: names/exchanges/sectors where available.
+- Visibility: CLI detail/raw view so every stored field is reachable.
+- Tax lot selection: capture `tax_lot_selection_type` (FIFO/LIFO/specific ID) and selected lot details when available.
+
+**Outputs:**
+
+- Schema/repo updates where needed (new tables for crypto/orders/executions/account snapshots if required).
+- Adapter updates to populate the new fields with fail-fast validation.
+- CLI: detail/raw modes to inspect all fields; filters to narrow scope.
+- QA/audit command to report counts, missing required fields, and latest timestamps.
+
+______________________________________________________________________
+
+## Near-Term Focus (before analytics)
+
+1. **Data visibility & detail (issue #53)**
+
+   - Add `--raw-json`/`--all-fields` and per-transaction detail view so every stored field is visible (fees, P/L, account_id, legs, strikes, expirations, quantities, position_effect, etc.).
+   - Add `--last N`/`--id` convenience for “what was my last transaction?”
+
+1. **Positions enrichment & usability**
+
+   - Fetch current quotes to populate `current_price`.
+   - Derive/validate `cost_basis` when missing; fail if critical fields absent.
+   - Add `--open-only` filter (optionally hide zero-quantity positions).
+
+1. **Data QA / audit**
+
+   - Command to report counts per type, missing fields (symbol/fees/P&L), latest timestamps, and gaps.
+   - Optional export (JSON/CSV) for ad-hoc checks.
+
+(*Held as future/target capabilities once data capture is complete: collateral/expiry views, P&L/lot engines, wash-sale checks, option cash-flow tracking, benchmarks/exposure.*)
+
 **Success Criteria:**
 
 - Can login and store credentials securely
 - Can sync transactions and positions
 - Can query and view local data
 - All interfaces share same application layer code
+- Goal: users can ask natural questions about their own data (via CLI/MCP later) and get answers—this guides the roadmap, but the Q&A experience itself is not part of Phase 4.
 
 ______________________________________________________________________
 
-## Phase 4: Data Sync & Updates
+## Phase 5: Data Sync & Updates
 
 **Focus:** Incremental sync, deduplication, and intelligent updates
 
-### 4.1 Incremental Sync
+### 5.1 Incremental Sync
 
 **File:** `src/tradedata/application/incremental_sync.py`
 
@@ -581,7 +650,7 @@ ______________________________________________________________________
 - Detect and resolve conflicts (same transaction from multiple sources)
 - **Note:** Sync and enrichment are separate operations. Sync fetches raw data, enrichment happens separately.
 
-### 4.2 Position Updates
+### 5.2 Position Updates
 
 **File:** `src/tradedata/application/position_tracking.py`
 
@@ -592,11 +661,11 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## Phase 5: Data Export & APIs
+## Phase 6: Data Export & APIs
 
 **Focus:** Export data in various formats and provide query APIs for other tools
 
-### 5.1 Export Functions
+### 6.1 Export Functions
 
 **File:** `src/tradedata/export/exporters.py`
 
@@ -613,7 +682,7 @@ ______________________________________________________________________
 - Include/exclude enriched data
 - Include/exclude raw data
 
-### 5.2 Transaction Linking
+### 6.2 Transaction Linking
 
 **File:** `src/tradedata/linking/linker.py`
 
@@ -653,7 +722,7 @@ ______________________________________________________________________
 - Multi-leg spread detection
 - Custom linking rules
 
-### 5.3 Query API
+### 6.3 Query API
 
 **File:** `src/tradedata/api/query.py`
 
@@ -673,13 +742,13 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## Phase 6: Data Enrichment
+## Phase 7: Data Enrichment
 
 **Focus:** Add historical market data enrichment for analytics (Greeks, IV, technical indicators at trade time)
 
 **⚠️ Important:** Enrichment strategy validation is in progress. See `../rhscrape/docs/ENRICHMENT_CONSTRAINTS.md` for current status. The `enriched_data` schema may need adjustment based on API availability validation.
 
-### 6.1 Enrichment Pipeline
+### 7.1 Enrichment Pipeline
 
 **File:** `src/enrichment/enricher.py`
 
@@ -714,7 +783,7 @@ ______________________________________________________________________
 - Historical stock data: `robin_stocks.stocks.get_historicals()`
 - Technical indicators: Calculate from historical data (pandas-ta or ta-lib)
 
-### 6.2 Greeks Fetcher
+### 7.2 Greeks Fetcher
 
 **File:** `src/enrichment/greeks.py`
 
@@ -733,7 +802,7 @@ ______________________________________________________________________
 - Cache results to avoid re-fetching
 - **Re-enrichment:** Allow re-enriching transactions (overwrite existing enriched data) - useful if we add new indicators, improve enrichment logic, or switch data sources
 
-### 6.3 Technical Indicators
+### 7.3 Technical Indicators
 
 **File:** `src/enrichment/technicals.py`
 
@@ -741,7 +810,7 @@ ______________________________________________________________________
 - Support multiple timeframes (1min, 5min, daily, etc.)
 - Store indicators at trade timestamp
 
-### 6.4 IV Fetcher
+### 7.4 IV Fetcher
 
 **File:** `src/enrichment/iv.py`
 
@@ -819,16 +888,16 @@ tradedata/
 │   │   ├── __init__.py
 │   │   ├── credentials.py        # Keyring credential management
 │   │   └── robinhood_sync.py     # Sync orchestration
-│   ├── enrichment/               # Phase 6 (future)
+│   ├── enrichment/               # Phase 7 (future)
 │   │   ├── __init__.py
 │   │   ├── enricher.py
 │   │   ├── greeks.py
 │   │   ├── technicals.py
 │   │   └── iv.py
-│   ├── linking/                  # Phase 5 (future)
+│   ├── linking/                  # Phase 6 (future)
 │   │   ├── __init__.py
 │   │   └── linker.py
-│   └── export/                   # Phase 5 (future)
+│   └── export/                   # Phase 6 (future)
 │       ├── __init__.py
 │       └── exporters.py
 │
