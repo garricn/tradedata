@@ -575,6 +575,14 @@ ______________________________________________________________________
 
 **Goal:** Ensure all Robinhood-sourced data is ingested, stored, and visible before deeper analytics.
 
+**Sub-phases:**
+
+- **4.1 Visibility & detail:** Full/raw payload visibility and per-transaction detail (issue #53), convenience queries (`--last/--id`), QA/audit command (counts, missing fields, latest timestamps), optional export (JSON/CSV).
+- **4.2 Positions enrichment:** Fetch quotes for `current_price`, derive/validate `cost_basis`, add `--open-only`, capture option/crypto positions if available.
+- **4.3 Orders & executions:** Fees/commissions/adjustments; order lifecycle (states, last transaction time, extended-hours flags); populate executions for stock orders (per-fill price/qty/timestamp); capture option assignments/exercises/expirations explicitly.
+- **4.4 Crypto/dividends/transfers extras:** Dedicated/richer crypto mapping (state changes, fees, executions); surface extra dividend/transfer fields (withholding/DRIP/ref ids/fees) in detail views.
+- **4.5 Accounts/metadata:** Account/portfolio snapshots (cash, buying power, margin balances/equity if exposed); instrument/fundamentals metadata (names/exchanges/sectors); tax lot selection (`tax_lot_selection_type` and selected lot details when available).
+
 **Scope:**
 
 - Fees/commissions/adjustments: persist on orders/executions where present.
