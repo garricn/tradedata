@@ -506,7 +506,7 @@ def sync_positions(source="robinhood"):
 
 ______________________________________________________________________
 
-## Phase 3: Simple CLI Interface ← COMPLETE (core) / EXTENDED WORK IN PROGRESS
+## Phase 3: Simple CLI Interface ← COMPLETE
 
 **Focus:** Build minimal CLI for testing and validating the application layer. Keep it simple - just enough to login, sync data, and view it.
 
@@ -564,7 +564,7 @@ uv run tradedata sync all        # Everything
 - Enriched, per-type tables for `show transactions` with `--raw` fallback
 - Type filters for both sync/show
 
-**Extended (planned/queued):**
+**Extended (moved to Phase 4):**
 
 - Full/raw payload visibility and per-transaction detail (issue #53)
 - Convenience queries (`--last N`, `--id/--source-id`)
@@ -616,17 +616,7 @@ ______________________________________________________________________
    - Command to report counts per type, missing fields (symbol/fees/P&L), latest timestamps, and gaps.
    - Optional export (JSON/CSV) for ad-hoc checks.
 
-1. **Option collateral & expiry visibility**
-
-   - Surface secured short put collateral requirements and expiry buckets (e.g., “collateral expiring 2025-12-19”).
-   - Identify candidates to close/roll based on expiry proximity and P/L.
-
-1. **Performance/analytics staging**
-
-   - Lot-level realized/unrealized P&L engine (fees included).
-   - Wash-sale detection.
-   - Option cash-flow and premium tracking.
-   - Benchmark and sector exposure ready for later phases.
+(*Held as future/target capabilities once data capture is complete: collateral/expiry views, P&L/lot engines, wash-sale checks, option cash-flow tracking, benchmarks/exposure.*)
 
 **Success Criteria:**
 
@@ -634,6 +624,7 @@ ______________________________________________________________________
 - Can sync transactions and positions
 - Can query and view local data
 - All interfaces share same application layer code
+- Goal: users can ask natural questions about their own data (via CLI/MCP later) and get answers—this guides the roadmap, but the Q&A experience itself is not part of Phase 4.
 
 ______________________________________________________________________
 
