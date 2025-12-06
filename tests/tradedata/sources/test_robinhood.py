@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from tradedata.sources.robinhood import RobinhoodAdapter
+from tradedata.sources.robinhood import RobinhoodAdapter, RobinhoodAPIWrapper
 
 
 class TestRobinhoodAdapter:
@@ -62,6 +62,25 @@ class TestRobinhoodAdapter:
         # Only stock-2 should be in range
         assert len(transactions) == 0  # stock-1 is before start, stock-2 is after end
 
+    def test_extract_transactions_top_level_option_orders(self):
+        """Use top-level option orders when options module lacks method."""
+        mock_rh = MagicMock()
+        mock_rh.orders = MagicMock()
+        mock_rh.orders.get_all_stock_orders.return_value = [
+            {"id": "stock-1", "symbol": "AAPL", "created_at": "2025-01-01T10:00:00Z"},
+        ]
+        mock_rh.get_all_option_orders.return_value = [
+            {"id": "option-1", "legs": [], "created_at": "2025-01-02T10:00:00Z"},
+        ]
+        mock_rh.options = MagicMock()
+        del mock_rh.options.get_all_option_orders
+
+        adapter = RobinhoodAdapter(robin_stocks=RobinhoodAPIWrapper(mock_rh))
+        transactions = adapter.extract_transactions()
+
+        assert len(transactions) == 2
+        mock_rh.get_all_option_orders.assert_called_once()
+
     def test_extract_positions(self):
         """Test extracting positions from Robinhood API."""
         mock_rh = MagicMock()
@@ -78,6 +97,41 @@ class TestRobinhoodAdapter:
         assert len(positions) == 2
         assert positions[0]["symbol"] == "AAPL"
         assert positions[1]["symbol"] == "AAPL250120C150"
+
+    def test_extract_positions_fallbacks_for_stock_positions(self):
+        """Use top-level stock positions when stocks module lacks method."""
+        mock_rh = MagicMock()
+        mock_rh.get_open_stock_positions.return_value = [
+            {"symbol": "AAPL", "quantity": "1.0", "cost_basis": "1.0", "current_price": "2.0"},
+        ]
+
+        adapter = RobinhoodAdapter(robin_stocks=mock_rh)
+
+        positions = adapter.extract_positions()
+
+        assert len(positions) == 1
+        mock_rh.get_open_stock_positions.assert_called_once()
+
+    def test_extract_positions_fallbacks_for_option_positions(self):
+        """Use combined positions fallback when option positions method missing."""
+        mock_rh = MagicMock(spec=["get_all_positions", "get_open_stock_positions"])
+        mock_rh.get_open_stock_positions.return_value = []
+        mock_rh.get_all_positions.return_value = [
+            {"symbol": "AAPL", "quantity": "1.0", "cost_basis": "1.0", "current_price": "2.0"},
+            {
+                "symbol": "AAPL230120C100",
+                "quantity": "2.0",
+                "cost_basis": "1.0",
+                "current_price": "2.0",
+            },
+        ]
+
+        adapter = RobinhoodAdapter(robin_stocks=RobinhoodAPIWrapper(mock_rh))
+
+        positions = adapter.extract_positions()
+
+        assert len(positions) == 2
+        mock_rh.get_all_positions.assert_called_once()
 
     def test_normalize_transaction_stock(self):
         """Test normalizing a stock transaction."""
@@ -274,6 +328,42 @@ class TestRobinhoodAdapter:
         assert position.cost_basis == 150.0
         assert position.current_price == 155.0
         assert position.unrealized_pnl == 50.0
+
+    def test_normalize_position_resolves_symbol_from_instrument(self):
+        """Symbol should be resolved via instrument URL when missing."""
+        mock_rh = MagicMock()
+        mock_rh.get_symbol_by_url.return_value = "MSFT"
+        adapter = RobinhoodAdapter(robin_stocks=mock_rh)
+        raw_position = {
+            "instrument": "https://api.robinhood.com/instruments/some-id/",
+            "quantity": "5.0",
+            "cost_basis": "10.0",
+            "current_price": "12.0",
+            "unrealized_pnl": "10.0",
+            "updated_at": "2025-02-01T00:00:00Z",
+        }
+
+        position = adapter.normalize_position(raw_position)
+
+        assert position.symbol == "MSFT"
+        mock_rh.get_symbol_by_url.assert_called_once()
+
+    def test_normalize_position_uses_chain_symbol(self):
+        """Option positions should use chain_symbol when symbol missing."""
+        mock_rh = MagicMock()
+        adapter = RobinhoodAdapter(robin_stocks=mock_rh)
+        raw_position = {
+            "chain_symbol": "AVGO",
+            "quantity": "1.0",
+            "cost_basis": "0.0",
+            "current_price": "0.0",
+            "unrealized_pnl": "0.0",
+            "updated_at": "2025-02-01T00:00:00Z",
+        }
+
+        position = adapter.normalize_position(raw_position)
+
+        assert position.symbol == "AVGO"
 
     def test_determine_transaction_type(self):
         """Test determining transaction type from raw data."""
