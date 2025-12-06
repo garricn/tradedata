@@ -1,6 +1,7 @@
 """Tests for Robinhood adapter."""
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from tradedata.sources.robinhood import RobinhoodAdapter, RobinhoodAPIWrapper
@@ -8,6 +9,12 @@ from tradedata.sources.robinhood import RobinhoodAdapter, RobinhoodAPIWrapper
 
 class TestRobinhoodAdapter:
     """Tests for RobinhoodAdapter class."""
+
+    @staticmethod
+    def _load_fixture(name: str) -> list[dict]:
+        fixture_path = Path(__file__).resolve().parents[2] / "fixtures" / "robinhood" / name
+        data = json.loads(fixture_path.read_text())
+        return list(data)
 
     def test_init_without_credentials(self):
         """Test adapter initialization without credentials."""
@@ -29,19 +36,15 @@ class TestRobinhoodAdapter:
     def test_extract_transactions(self):
         """Test extracting transactions from Robinhood API."""
         mock_rh = MagicMock()
-        mock_rh.get_all_stock_orders.return_value = [
-            {"id": "stock-1", "symbol": "AAPL", "created_at": "2025-01-01T10:00:00Z"},
-        ]
-        mock_rh.get_all_option_orders.return_value = [
-            {"id": "option-1", "legs": [], "created_at": "2025-01-02T10:00:00Z"},
-        ]
+        mock_rh.get_all_stock_orders.return_value = self._load_fixture("stock_orders.json")
+        mock_rh.get_all_option_orders.return_value = self._load_fixture("option_orders.json")
 
         adapter = RobinhoodAdapter(robin_stocks=mock_rh)
         transactions = adapter.extract_transactions()
 
         assert len(transactions) == 2
-        assert transactions[0]["id"] == "stock-1"
-        assert transactions[1]["id"] == "option-1"
+        assert transactions[0]["id"] == "stock-order-1"
+        assert transactions[1]["id"] == "opt-order-1"
         mock_rh.get_all_stock_orders.assert_called_once()
         mock_rh.get_all_option_orders.assert_called_once()
 
@@ -49,8 +52,16 @@ class TestRobinhoodAdapter:
         """Test extracting transactions with date filtering."""
         mock_rh = MagicMock()
         mock_rh.get_all_stock_orders.return_value = [
-            {"id": "stock-1", "symbol": "AAPL", "created_at": "2025-01-15T10:00:00Z"},
-            {"id": "stock-2", "symbol": "MSFT", "created_at": "2025-02-15T10:00:00Z"},
+            {
+                "id": "stock-1",
+                "symbol": "AAPL",
+                "created_at": "2025-01-15T10:00:00Z",
+            },
+            {
+                "id": "stock-2",
+                "symbol": "MSFT",
+                "created_at": "2025-02-15T10:00:00Z",
+            },
         ]
         mock_rh.get_all_option_orders.return_value = []
 
