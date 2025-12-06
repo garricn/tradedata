@@ -16,6 +16,7 @@ class TestPositionRepository:
         position = Position(
             id="pos-1",
             source="robinhood",
+            account_id="acc-1",
             symbol="AAPL",
             quantity=100.0,
             cost_basis=15000.0,
@@ -42,6 +43,7 @@ class TestPositionRepository:
         pos1 = Position(
             id="pos-1",
             source="robinhood",
+            account_id="acc-1",
             symbol="AAPL",
             quantity=100.0,
             cost_basis=15000.0,
@@ -52,6 +54,7 @@ class TestPositionRepository:
         pos2 = Position(
             id="pos-2",
             source="ibkr",
+            account_id="acc-2",
             symbol="TSLA",
             quantity=50.0,
             cost_basis=10000.0,

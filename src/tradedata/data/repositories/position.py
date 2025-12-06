@@ -13,7 +13,7 @@ class PositionRepository(BaseRepository[Position]):
         """Get position by ID."""
         row = self.storage.fetchone(
             """
-            SELECT id, source, symbol, quantity, cost_basis, current_price,
+            SELECT id, source, account_id, symbol, quantity, cost_basis, current_price,
                    unrealized_pnl, last_updated
             FROM positions WHERE id = ?
             """,
@@ -29,9 +29,9 @@ class PositionRepository(BaseRepository[Position]):
             conn.execute(
                 """
                 INSERT INTO positions
-                    (id, source, symbol, quantity, cost_basis, current_price,
+                    (id, source, account_id, symbol, quantity, cost_basis, current_price,
                      unrealized_pnl, last_updated)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 entity.to_db_tuple(),
             )
@@ -41,9 +41,9 @@ class PositionRepository(BaseRepository[Position]):
             tx_conn.execute(
                 """
                 INSERT INTO positions
-                    (id, source, symbol, quantity, cost_basis, current_price,
+                    (id, source, account_id, symbol, quantity, cost_basis, current_price,
                      unrealized_pnl, last_updated)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 entity.to_db_tuple(),
             )
@@ -53,6 +53,7 @@ class PositionRepository(BaseRepository[Position]):
         """Update an existing position."""
         params = (
             entity.source,
+            entity.account_id,
             entity.symbol,
             entity.quantity,
             entity.cost_basis,
@@ -65,7 +66,7 @@ class PositionRepository(BaseRepository[Position]):
             conn.execute(
                 """
                 UPDATE positions
-                SET source = ?, symbol = ?, quantity = ?, cost_basis = ?,
+                SET source = ?, account_id = ?, symbol = ?, quantity = ?, cost_basis = ?,
                     current_price = ?, unrealized_pnl = ?, last_updated = ?
                 WHERE id = ?
                 """,
@@ -77,7 +78,7 @@ class PositionRepository(BaseRepository[Position]):
             tx_conn.execute(
                 """
                 UPDATE positions
-                SET source = ?, symbol = ?, quantity = ?, cost_basis = ?,
+                SET source = ?, account_id = ?, symbol = ?, quantity = ?, cost_basis = ?,
                     current_price = ?, unrealized_pnl = ?, last_updated = ?
                 WHERE id = ?
                 """,
@@ -99,7 +100,7 @@ class PositionRepository(BaseRepository[Position]):
         """Find all positions."""
         rows = self.storage.fetchall(
             """
-            SELECT id, source, symbol, quantity, cost_basis, current_price,
+            SELECT id, source, account_id, symbol, quantity, cost_basis, current_price,
                    unrealized_pnl, last_updated
             FROM positions
             """
@@ -110,7 +111,7 @@ class PositionRepository(BaseRepository[Position]):
         """Find positions by source."""
         rows = self.storage.fetchall(
             """
-            SELECT id, source, symbol, quantity, cost_basis, current_price,
+            SELECT id, source, account_id, symbol, quantity, cost_basis, current_price,
                    unrealized_pnl, last_updated
             FROM positions WHERE source = ?
             """,

@@ -460,6 +460,7 @@ class TestRobinhoodAdapter:
             "current_price": "155.0",
             "unrealized_pnl": "50.0",
             "updated_at": "2025-01-15T10:00:00Z",
+            "account": "https://api.robinhood.com/accounts/ACC123/",
         }
 
         mock_rh = MagicMock()
@@ -472,6 +473,7 @@ class TestRobinhoodAdapter:
         assert position.cost_basis == 150.0
         assert position.current_price == 155.0
         assert position.unrealized_pnl == 50.0
+        assert position.account_id == "ACC123"
 
     def test_normalize_position_resolves_symbol_from_instrument(self):
         """Symbol should be resolved via instrument URL when missing."""
@@ -490,6 +492,7 @@ class TestRobinhoodAdapter:
         position = adapter.normalize_position(raw_position)
 
         assert position.symbol == "MSFT"
+        assert position.account_id is None
         mock_rh.get_symbol_by_url.assert_called_once()
 
     def test_normalize_position_uses_chain_symbol(self):
@@ -503,11 +506,13 @@ class TestRobinhoodAdapter:
             "current_price": "0.0",
             "unrealized_pnl": "0.0",
             "updated_at": "2025-02-01T00:00:00Z",
+            "account_id": "acc-999",
         }
 
         position = adapter.normalize_position(raw_position)
 
         assert position.symbol == "AVGO"
+        assert position.account_id == "acc-999"
 
     def test_normalize_position_raises_when_symbol_unresolved(self):
         """Fail when neither symbol nor chain_symbol nor instrument resolution is available."""

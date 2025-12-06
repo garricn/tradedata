@@ -321,6 +321,9 @@ def validate_position(position: Position) -> None:
     if not isinstance(position.quantity, (int, float)):
         raise ValidationError("Position.quantity: must be number")
 
+    if position.account_id is not None and not isinstance(position.account_id, str):
+        raise ValidationError("Position.account_id: must be string or None")
+
     # Optional fields
     if position.cost_basis is not None and not isinstance(position.cost_basis, (int, float)):
         raise ValidationError("Position.cost_basis: must be number or None")

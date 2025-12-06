@@ -277,6 +277,7 @@ def test_position_model():
     position = Position(
         id="pos-123",
         source="robinhood",
+        account_id="acc-123",
         symbol="AAPL",
         quantity=100.0,
         cost_basis=15000.0,
@@ -290,6 +291,7 @@ def test_position_model():
     assert db_tuple == (
         "pos-123",
         "robinhood",
+        "acc-123",
         "AAPL",
         100.0,
         15000.0,
@@ -302,6 +304,7 @@ def test_position_model():
     position2 = Position.from_db_row(db_tuple)
     assert position2.id == position.id
     assert position2.source == position.source
+    assert position2.account_id == position.account_id
     assert position2.symbol == position.symbol
     assert position2.quantity == position.quantity
     assert position2.cost_basis == position.cost_basis
@@ -315,6 +318,7 @@ def test_position_with_none_fields():
     position = Position(
         id="pos-123",
         source="robinhood",
+        account_id=None,
         symbol="AAPL",
         quantity=100.0,
         cost_basis=None,
@@ -324,11 +328,13 @@ def test_position_with_none_fields():
     )
 
     db_tuple = position.to_db_tuple()
-    assert db_tuple[4] is None
+    assert db_tuple[2] is None
     assert db_tuple[5] is None
     assert db_tuple[6] is None
+    assert db_tuple[7] is None
 
     position2 = Position.from_db_row(db_tuple)
+    assert position2.account_id is None
     assert position2.cost_basis is None
     assert position2.current_price is None
     assert position2.unrealized_pnl is None

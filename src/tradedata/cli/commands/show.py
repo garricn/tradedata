@@ -176,6 +176,7 @@ def show_positions() -> None:
         rows.append(
             [
                 pos.id,
+                pos.account_id or "",
                 pos.symbol,
                 str(pos.quantity),
                 str(pos.cost_basis),
@@ -185,7 +186,7 @@ def show_positions() -> None:
         )
 
     output = _table(
-        ["ID", "Symbol", "Quantity", "Cost Basis", "Current Price", "Source"],
+        ["ID", "Account", "Symbol", "Quantity", "Cost Basis", "Current Price", "Source"],
         rows,
     )
     click.echo(output)

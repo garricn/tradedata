@@ -152,6 +152,7 @@ def test_schema_includes_indexes():
     assert "idx_transactions_source" in schema
     assert "idx_transactions_type" in schema
     assert "idx_transactions_created_at" in schema
+    assert "idx_positions_account_id" in schema
 
 
 def test_transactions_table_structure():
@@ -167,6 +168,24 @@ def test_transactions_table_structure():
     assert "created_at" in columns
     assert "account_id" in columns
     assert "raw_data" in columns
+    conn.close()
+
+
+def test_positions_table_structure():
+    """Test positions table has correct columns."""
+    conn = initialize_database(db_path=":memory:")
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(positions)")
+    columns = {row[1]: row[2] for row in cursor.fetchall()}
+    assert "id" in columns
+    assert "source" in columns
+    assert "account_id" in columns
+    assert "symbol" in columns
+    assert "quantity" in columns
+    assert "cost_basis" in columns
+    assert "current_price" in columns
+    assert "unrealized_pnl" in columns
+    assert "last_updated" in columns
     conn.close()
 
 
