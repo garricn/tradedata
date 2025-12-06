@@ -755,10 +755,12 @@ class RobinhoodAdapter(DataSourceAdapter):
         current_price = self._safe_float(raw_position.get("current_price")) or 0.0
         unrealized_pnl = self._safe_float(raw_position.get("unrealized_pnl")) or 0.0
         last_updated = self._extract_timestamp(raw_position)
+        account_id = self._extract_account_id(raw_position)
 
         return Position(
             id=position_id,
             source="robinhood",
+            account_id=account_id,
             symbol=symbol,
             quantity=quantity,
             cost_basis=cost_basis,
@@ -766,6 +768,19 @@ class RobinhoodAdapter(DataSourceAdapter):
             unrealized_pnl=unrealized_pnl,
             last_updated=last_updated,
         )
+
+    def _extract_account_id(self, payload: dict[str, Any]) -> Optional[str]:
+        """Extract account identifier from payload (URL or id/last4)."""
+        account = payload.get("account_id") or payload.get("account")
+        if not account:
+            return None
+
+        account_str = str(account)
+        if "/" in account_str:
+            trimmed = account_str.rstrip("/")
+            last_segment = trimmed.split("/")[-1]
+            return last_segment or trimmed
+        return account_str
 
     def _safe_float(self, value: Any) -> Optional[float]:
         """Safely convert value to float.

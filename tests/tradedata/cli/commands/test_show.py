@@ -86,6 +86,7 @@ def test_show_positions_invokes_listing(monkeypatch):
     position = Position(
         id="pos-1",
         source="robinhood",
+        account_id="acc-1",
         symbol="AAPL",
         quantity=10.0,
         cost_basis=150.0,
@@ -108,3 +109,4 @@ def test_show_positions_invokes_listing(monkeypatch):
     assert result.exit_code == 0
     assert "AAPL" in result.output
     assert "pos-1" in result.output
+    assert "acc-1" in result.output

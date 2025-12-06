@@ -352,6 +352,7 @@ class FakePositionAdapter:
                 "current_price": "155.0",
                 "unrealized_pnl": "50.0",
                 "last_updated": "2025-02-01T00:00:00Z",
+                "account": "acc-123",
             },
             {
                 "symbol": "MSFT",
@@ -360,6 +361,7 @@ class FakePositionAdapter:
                 "current_price": "330.0",
                 "unrealized_pnl": "50.0",
                 "last_updated": "2025-02-02T00:00:00Z",
+                "account_id": "acc-456",
             },
         ]
 
@@ -374,6 +376,7 @@ class FakePositionAdapter:
         return Position(
             id=str(uuid.uuid4()),
             source="robinhood",
+            account_id=raw_position.get("account_id") or raw_position.get("account"),
             symbol=raw_position["symbol"],
             quantity=float(raw_position["quantity"]),
             cost_basis=float(raw_position["cost_basis"]),
@@ -403,6 +406,8 @@ def test_sync_positions_persists_positions(monkeypatch):
     assert len(positions) == len(adapter.raw_positions)
     symbols = {p.symbol for p in positions}
     assert symbols == {"AAPL", "MSFT"}
+    account_ids = {p.account_id for p in positions}
+    assert account_ids == {"acc-123", "acc-456"}
 
 
 def test_sync_positions_uses_factory_when_adapter_not_provided(monkeypatch):
@@ -431,6 +436,7 @@ def test_sync_positions_raises_on_validation_failure(monkeypatch):
     bad_adapter.normalize_position.return_value = Position(
         id=str(uuid.uuid4()),
         source="robinhood",
+        account_id=None,
         symbol="bad",
         quantity=1.0,
         cost_basis=None,

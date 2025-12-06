@@ -127,6 +127,7 @@ CREATE TABLE IF NOT EXISTS stock_orders (
 CREATE TABLE IF NOT EXISTS positions (
     id TEXT PRIMARY KEY,
     source TEXT NOT NULL,
+    account_id TEXT,
     symbol TEXT NOT NULL,
     quantity REAL NOT NULL,
     cost_basis REAL,
@@ -154,6 +155,7 @@ CREATE INDEX IF NOT EXISTS idx_option_legs_order_id ON option_legs(order_id);
 CREATE INDEX IF NOT EXISTS idx_executions_order_id ON executions(order_id);
 CREATE INDEX IF NOT EXISTS idx_positions_source ON positions(source);
 CREATE INDEX IF NOT EXISTS idx_positions_symbol ON positions(symbol);
+CREATE INDEX IF NOT EXISTS idx_positions_account_id ON positions(account_id);
 CREATE INDEX IF NOT EXISTS idx_transaction_links_opening
     ON transaction_links(opening_transaction_id);
 CREATE INDEX IF NOT EXISTS idx_transaction_links_closing

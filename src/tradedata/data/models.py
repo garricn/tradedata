@@ -330,6 +330,7 @@ class Position:
     Attributes:
         id: Unique identifier (UUID as string)
         source: Data source (e.g., 'robinhood', 'ibkr')
+        account_id: Account identifier (URL/last4) if available
         symbol: Symbol or option identifier
         quantity: Position quantity
         cost_basis: Cost basis (optional)
@@ -340,6 +341,7 @@ class Position:
 
     id: str
     source: str
+    account_id: Optional[str]
     symbol: str
     quantity: float
     cost_basis: Optional[float]
@@ -353,7 +355,7 @@ class Position:
 
         Args:
             row: Database row tuple in order:
-                (id, source, symbol, quantity, cost_basis, current_price,
+                (id, source, account_id, symbol, quantity, cost_basis, current_price,
                  unrealized_pnl, last_updated)
 
         Returns:
@@ -362,12 +364,13 @@ class Position:
         return cls(
             id=row[0],
             source=row[1],
-            symbol=row[2],
-            quantity=row[3],
-            cost_basis=row[4],
-            current_price=row[5],
-            unrealized_pnl=row[6],
-            last_updated=row[7],
+            account_id=row[2],
+            symbol=row[3],
+            quantity=row[4],
+            cost_basis=row[5],
+            current_price=row[6],
+            unrealized_pnl=row[7],
+            last_updated=row[8],
         )
 
     def to_db_tuple(self) -> tuple:
@@ -375,12 +378,13 @@ class Position:
 
         Returns:
             Tuple in order:
-                (id, source, symbol, quantity, cost_basis, current_price,
+                (id, source, account_id, symbol, quantity, cost_basis, current_price,
                  unrealized_pnl, last_updated)
         """
         return (
             self.id,
             self.source,
+            self.account_id,
             self.symbol,
             self.quantity,
             self.cost_basis,

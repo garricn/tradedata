@@ -61,6 +61,7 @@ def test_list_positions_returns_all(monkeypatch):
     position = Position(
         id="pos-1",
         source="robinhood",
+        account_id="acc-1",
         symbol="AAPL",
         quantity=10.0,
         cost_basis=150.0,

@@ -300,6 +300,7 @@ class TestPositionValidation:
         position = Position(
             id="550e8400-e29b-41d4-a716-446655440000",
             source="robinhood",
+            account_id="acc-123",
             symbol="AAPL",
             quantity=100.0,
             cost_basis=15000.0,
@@ -314,6 +315,7 @@ class TestPositionValidation:
         position = Position(
             id="550e8400-e29b-41d4-a716-446655440000",
             source="robinhood",
+            account_id=None,
             symbol="",
             quantity=100.0,
             cost_basis=None,
