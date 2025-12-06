@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from click.testing import CliRunner
 
+from tradedata.application.listing import TransactionTable
 from tradedata.cli.main import cli
 from tradedata.data.models import Position, Transaction
 
@@ -23,15 +24,20 @@ def test_show_transactions_invokes_listing(monkeypatch):
 
     captured = {}
 
-    def fake_list_transactions(transaction_type=None, transaction_types=None, days=None):
-        captured["transaction_type"] = transaction_type
+    def fake_list_enriched(transaction_types=None, days=None, storage=None):
         captured["transaction_types"] = transaction_types
         captured["days"] = days
-        return [tx]
+        return [
+            TransactionTable(
+                transaction_type="stock",
+                headers=["ID", "Type"],
+                rows=[[tx.id, tx.type]],
+            )
+        ]
 
     monkeypatch.setattr(
-        "tradedata.cli.commands.show.listing.list_transactions",
-        fake_list_transactions,
+        "tradedata.cli.commands.show.listing.list_enriched_transaction_tables",
+        fake_list_enriched,
     )
 
     runner = CliRunner()

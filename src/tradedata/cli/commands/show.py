@@ -13,9 +13,9 @@ from tradedata.application import listing
 
 def _table(headers: list[str], rows: Iterable[list[str]]) -> str:
     """Render a simple table using rich."""
-    table = Table(show_header=True, header_style="bold", box=box.SIMPLE)
+    table = Table(show_header=True, header_style="bold", box=box.SIMPLE, expand=True)
     for header in headers:
-        table.add_column(header)
+        table.add_column(header, overflow="fold")
     for row in rows:
         table.add_row(*row)
 
@@ -53,23 +53,41 @@ def show() -> None:
     type=int,
     help="Only include transactions from the past N days.",
 )
-def show_transactions(transaction_types: tuple[str, ...], days: Optional[int]) -> None:
+@click.option(
+    "--raw",
+    is_flag=True,
+    help="Show the base transaction view instead of enriched, type-specific tables.",
+)
+def show_transactions(transaction_types: tuple[str, ...], days: Optional[int], raw: bool) -> None:
     """Show stored transactions with optional filters."""
     tx_types = _parse_types_option(transaction_types)
-    transactions = listing.list_transactions(transaction_types=tx_types, days=days)
-    if not transactions:
+    if raw:
+        transactions = listing.list_transactions(transaction_types=tx_types, days=days)
+        if not transactions:
+            click.echo("No transactions found.")
+            return
+
+        rows: list[list[str]] = []
+        for tx in transactions:
+            rows.append([tx.id, tx.type, tx.source, tx.created_at, tx.source_id])
+
+        output = _table(
+            ["ID", "Type", "Source", "Created At", "Source ID"],
+            rows,
+        )
+        click.echo(output)
+        return
+
+    tables = listing.list_enriched_transaction_tables(transaction_types=tx_types, days=days)
+    if not tables:
         click.echo("No transactions found.")
         return
 
-    rows: list[list[str]] = []
-    for tx in transactions:
-        rows.append([tx.id, tx.type, tx.source, tx.created_at, tx.source_id])
-
-    output = _table(
-        ["ID", "Type", "Source", "Created At", "Source ID"],
-        rows,
-    )
-    click.echo(output)
+    for idx, table in enumerate(tables):
+        click.echo(f"{table.transaction_type.capitalize()} transactions")
+        click.echo(_table(table.headers, table.rows))
+        if idx < len(tables) - 1:
+            click.echo()
 
 
 @show.command("positions")
