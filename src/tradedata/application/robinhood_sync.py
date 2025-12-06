@@ -101,29 +101,31 @@ def sync_transactions(
             continue
         if tx_repo.exists_by_source_id(transaction.source, transaction.source_id):
             continue
-        tx_repo.create(transaction)
+        with storage.transaction() as conn:
+            tx_repo.create(transaction, conn=conn)
+
+            option_order = adapter.extract_option_order(raw_tx, transaction.id)
+            if option_order:
+                validate_option_order(option_order)
+                option_order_repo.create(option_order, conn=conn)
+
+                legs = adapter.extract_option_legs(raw_tx, option_order.id)
+                for leg in legs:
+                    validate_option_leg(leg)
+                    leg_repo.create(leg, conn=conn)
+
+                leg_ids = [leg.id for leg in legs] if legs else None
+                executions = adapter.extract_executions(raw_tx, transaction.id, leg_ids)
+                for execution in executions:
+                    validate_execution(execution)
+                    execution_repo.create(execution, conn=conn)
+            else:
+                stock_order = adapter.extract_stock_order(raw_tx, transaction.id)
+                if stock_order:
+                    validate_stock_order(stock_order)
+                    stock_repo.create(stock_order, conn=conn)
+
         stored_transactions.append(transaction)
-
-        option_order = adapter.extract_option_order(raw_tx, transaction.id)
-        if option_order:
-            validate_option_order(option_order)
-            option_order_repo.create(option_order)
-
-            legs = adapter.extract_option_legs(raw_tx, option_order.id)
-            for leg in legs:
-                validate_option_leg(leg)
-                leg_repo.create(leg)
-
-            leg_ids = [leg.id for leg in legs] if legs else None
-            executions = adapter.extract_executions(raw_tx, transaction.id, leg_ids)
-            for execution in executions:
-                validate_execution(execution)
-                execution_repo.create(execution)
-        else:
-            stock_order = adapter.extract_stock_order(raw_tx, transaction.id)
-            if stock_order:
-                validate_stock_order(stock_order)
-                stock_repo.create(stock_order)
 
     return stored_transactions
 

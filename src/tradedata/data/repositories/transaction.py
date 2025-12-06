@@ -32,10 +32,21 @@ class TransactionRepository(BaseRepository[Transaction]):
             return None
         return Transaction.from_db_row(row)
 
-    def create(self, entity: Transaction) -> Transaction:
+    def create(self, entity: Transaction, conn=None) -> Transaction:
         """Create a new transaction."""
-        with self.storage.transaction() as conn:
+        if conn is not None:
             conn.execute(
+                """
+                INSERT INTO transactions
+                    (id, source, source_id, type, created_at, account_id, raw_data)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                entity.to_db_tuple(),
+            )
+            return entity
+
+        with self.storage.transaction() as tx_conn:
+            tx_conn.execute(
                 """
                 INSERT INTO transactions
                     (id, source, source_id, type, created_at, account_id, raw_data)
@@ -45,9 +56,18 @@ class TransactionRepository(BaseRepository[Transaction]):
             )
         return entity
 
-    def update(self, entity: Transaction) -> Transaction:
+    def update(self, entity: Transaction, conn=None) -> Transaction:
         """Update an existing transaction."""
-        with self.storage.transaction() as conn:
+        params = (
+            entity.source,
+            entity.source_id,
+            entity.type,
+            entity.created_at,
+            entity.account_id,
+            entity.raw_data,
+            entity.id,
+        )
+        if conn is not None:
             conn.execute(
                 """
                 UPDATE transactions
@@ -55,22 +75,30 @@ class TransactionRepository(BaseRepository[Transaction]):
                     account_id = ?, raw_data = ?
                 WHERE id = ?
                 """,
-                (
-                    entity.source,
-                    entity.source_id,
-                    entity.type,
-                    entity.created_at,
-                    entity.account_id,
-                    entity.raw_data,
-                    entity.id,
-                ),
+                params,
+            )
+            return entity
+
+        with self.storage.transaction() as tx_conn:
+            tx_conn.execute(
+                """
+                UPDATE transactions
+                SET source = ?, source_id = ?, type = ?, created_at = ?,
+                    account_id = ?, raw_data = ?
+                WHERE id = ?
+                """,
+                params,
             )
         return entity
 
-    def delete(self, entity_id: str) -> bool:
+    def delete(self, entity_id: str, conn=None) -> bool:
         """Delete a transaction by ID."""
-        with self.storage.transaction() as conn:
+        if conn is not None:
             cursor = conn.execute("DELETE FROM transactions WHERE id = ?", (entity_id,))
+            return bool(cursor.rowcount > 0)
+
+        with self.storage.transaction() as tx_conn:
+            cursor = tx_conn.execute("DELETE FROM transactions WHERE id = ?", (entity_id,))
             return bool(cursor.rowcount > 0)
 
     def find_all(self) -> list[Transaction]:

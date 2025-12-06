@@ -1,5 +1,6 @@
 """Base repository class for all entity repositories."""
 
+import sqlite3
 from abc import ABC, abstractmethod
 from typing import Generic, Optional, TypeVar
 
@@ -35,11 +36,12 @@ class BaseRepository(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def create(self, entity: T) -> T:
+    def create(self, entity: T, conn: Optional[sqlite3.Connection] = None) -> T:
         """Create a new entity.
 
         Args:
             entity: Entity instance to create.
+            conn: Optional connection to use for atomic writes.
 
         Returns:
             Created entity instance.
@@ -47,11 +49,12 @@ class BaseRepository(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def update(self, entity: T) -> T:
+    def update(self, entity: T, conn: Optional[sqlite3.Connection] = None) -> T:
         """Update an existing entity.
 
         Args:
             entity: Entity instance with updated data.
+            conn: Optional connection to use for atomic writes.
 
         Returns:
             Updated entity instance.
@@ -59,11 +62,12 @@ class BaseRepository(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def delete(self, entity_id: str) -> bool:
+    def delete(self, entity_id: str, conn: Optional[sqlite3.Connection] = None) -> bool:
         """Delete an entity by ID.
 
         Args:
             entity_id: Entity identifier.
+            conn: Optional connection to use for atomic writes.
 
         Returns:
             True if deleted, False if not found.

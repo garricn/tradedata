@@ -23,10 +23,22 @@ class OptionLegRepository(BaseRepository[OptionLeg]):
             return None
         return OptionLeg.from_db_row(row)
 
-    def create(self, entity: OptionLeg) -> OptionLeg:
+    def create(self, entity: OptionLeg, conn=None) -> OptionLeg:
         """Create a new option leg."""
-        with self.storage.transaction() as conn:
+        if conn is not None:
             conn.execute(
+                """
+                INSERT INTO option_legs
+                    (id, order_id, strike_price, expiration_date, option_type,
+                     side, position_effect, ratio_quantity)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                entity.to_db_tuple(),
+            )
+            return entity
+
+        with self.storage.transaction() as tx_conn:
+            tx_conn.execute(
                 """
                 INSERT INTO option_legs
                     (id, order_id, strike_price, expiration_date, option_type,
@@ -37,9 +49,19 @@ class OptionLegRepository(BaseRepository[OptionLeg]):
             )
         return entity
 
-    def update(self, entity: OptionLeg) -> OptionLeg:
+    def update(self, entity: OptionLeg, conn=None) -> OptionLeg:
         """Update an existing option leg."""
-        with self.storage.transaction() as conn:
+        params = (
+            entity.order_id,
+            entity.strike_price,
+            entity.expiration_date,
+            entity.option_type,
+            entity.side,
+            entity.position_effect,
+            entity.ratio_quantity,
+            entity.id,
+        )
+        if conn is not None:
             conn.execute(
                 """
                 UPDATE option_legs
@@ -48,23 +70,31 @@ class OptionLegRepository(BaseRepository[OptionLeg]):
                     ratio_quantity = ?
                 WHERE id = ?
                 """,
-                (
-                    entity.order_id,
-                    entity.strike_price,
-                    entity.expiration_date,
-                    entity.option_type,
-                    entity.side,
-                    entity.position_effect,
-                    entity.ratio_quantity,
-                    entity.id,
-                ),
+                params,
+            )
+            return entity
+
+        with self.storage.transaction() as tx_conn:
+            tx_conn.execute(
+                """
+                UPDATE option_legs
+                SET order_id = ?, strike_price = ?, expiration_date = ?,
+                    option_type = ?, side = ?, position_effect = ?,
+                    ratio_quantity = ?
+                WHERE id = ?
+                """,
+                params,
             )
         return entity
 
-    def delete(self, entity_id: str) -> bool:
+    def delete(self, entity_id: str, conn=None) -> bool:
         """Delete an option leg by ID."""
-        with self.storage.transaction() as conn:
+        if conn is not None:
             cursor = conn.execute("DELETE FROM option_legs WHERE id = ?", (entity_id,))
+            return bool(cursor.rowcount > 0)
+
+        with self.storage.transaction() as tx_conn:
+            cursor = tx_conn.execute("DELETE FROM option_legs WHERE id = ?", (entity_id,))
             return bool(cursor.rowcount > 0)
 
     def find_all(self) -> list[OptionLeg]:
