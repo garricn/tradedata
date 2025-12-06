@@ -24,9 +24,10 @@ def test_show_transactions_invokes_listing(monkeypatch):
 
     captured = {}
 
-    def fake_list_enriched(transaction_types=None, days=None, storage=None):
+    def fake_list_enriched(transaction_types=None, days=None, last=None, storage=None):
         captured["transaction_types"] = transaction_types
         captured["days"] = days
+        captured["last"] = last
         return [
             TransactionTable(
                 transaction_type="stock",
@@ -46,6 +47,7 @@ def test_show_transactions_invokes_listing(monkeypatch):
     assert result.exit_code == 0
     assert captured["transaction_types"] == ["stock", "crypto"]
     assert captured["days"] == 10
+    assert captured["last"] is None
     assert "tx-recent" in result.output
     assert "stock" in result.output
 
