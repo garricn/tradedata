@@ -554,6 +554,10 @@ class TestRobinhoodAdapter:
         dividend_tx = {"type": "dividend"}
         assert adapter._determine_transaction_type(dividend_tx) == "dividend"
 
+        # Transfer transaction
+        transfer_tx = {"ach_relationship": "https://api.robinhood.com/ach/relationships/abc/"}
+        assert adapter._determine_transaction_type(transfer_tx) == "transfer"
+
     def test_extract_timestamp(self):
         """Test extracting timestamp from raw transaction."""
         mock_rh = MagicMock()
@@ -572,3 +576,7 @@ class TestRobinhoodAdapter:
         timestamp = adapter._extract_timestamp(tx3)
         assert timestamp is not None
         assert "Z" in timestamp or "+" in timestamp
+
+        # Test with transfer-specific timestamp field
+        tx4 = {"expected_landing_datetime": "2025-06-02T09:00:00-04:00"}
+        assert adapter._extract_timestamp(tx4) == "2025-06-02T09:00:00-04:00"
