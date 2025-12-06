@@ -888,16 +888,16 @@ tradedata/
 │   │   ├── __init__.py
 │   │   ├── credentials.py        # Keyring credential management
 │   │   └── robinhood_sync.py     # Sync orchestration
-│   ├── enrichment/               # Phase 6 (future)
+│   ├── enrichment/               # Phase 7 (future)
 │   │   ├── __init__.py
 │   │   ├── enricher.py
 │   │   ├── greeks.py
 │   │   ├── technicals.py
 │   │   └── iv.py
-│   ├── linking/                  # Phase 5 (future)
+│   ├── linking/                  # Phase 6 (future)
 │   │   ├── __init__.py
 │   │   └── linker.py
-│   └── export/                   # Phase 5 (future)
+│   └── export/                   # Phase 6 (future)
 │       ├── __init__.py
 │       └── exporters.py
 │
