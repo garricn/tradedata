@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional, Protocol
 
 try:
-    import robin_stocks.robinhood as rh_module
+    import robin_stocks.robinhood as rh_module  # type: ignore[import-untyped]
 except ImportError:
     rh_module = None  # type: ignore
 
@@ -402,14 +402,23 @@ class RobinhoodAdapter(DataSourceAdapter):
         Returns:
             Transaction type string (e.g., 'stock', 'option', 'crypto', 'dividend')
         """
+        instrument = raw_transaction.get("instrument", "")
+
         # Check for option-specific fields
-        if "legs" in raw_transaction or "option" in raw_transaction.get("instrument", ""):
+        if "legs" in raw_transaction or "option" in instrument:
             return "option"
 
         # Check for stock-specific fields
         symbol = raw_transaction.get("symbol")
-        if symbol and "option" not in raw_transaction.get("instrument", ""):
+        if symbol and "option" not in instrument:
             return "stock"
+        if instrument and "option" not in instrument:
+            resolved = self._resolve_symbol_from_instrument(raw_transaction)
+            if resolved:
+                return "stock"
+            raise ValueError(
+                "Stock transaction missing symbol and instrument could not be resolved"
+            )
 
         # Check for crypto
         if "crypto" in raw_transaction.get("type", "").lower():
@@ -587,9 +596,11 @@ class RobinhoodAdapter(DataSourceAdapter):
             return None
 
         # Extract stock order fields
-        symbol = raw_transaction.get("symbol", "")
+        symbol = raw_transaction.get("symbol") or self._resolve_symbol_from_instrument(
+            raw_transaction
+        )
         if not symbol:
-            return None
+            raise ValueError("Stock order missing symbol and instrument could not be resolved")
         side = raw_transaction.get("side", "").lower()
         quantity = self._safe_float(raw_transaction.get("quantity", 0)) or 0.0
         price = self._safe_float(raw_transaction.get("price")) or 0.0
@@ -614,13 +625,13 @@ class RobinhoodAdapter(DataSourceAdapter):
             Position model instance with normalized data.
         """
         position_id = str(uuid.uuid4())
-        symbol = raw_position.get("symbol") or raw_position.get("chain_symbol") or ""
+        symbol = (
+            raw_position.get("symbol")
+            or raw_position.get("chain_symbol")
+            or self._resolve_symbol_from_instrument(raw_position)
+        )
         if not symbol:
-            instrument_url = raw_position.get("instrument")
-            if instrument_url:
-                resolved = self.rh.get_symbol_by_url(instrument_url)
-                if resolved:
-                    symbol = resolved
+            raise ValueError("Position missing symbol and instrument could not be resolved")
         quantity = self._safe_float(raw_position.get("quantity", 0)) or 0.0
         cost_basis = self._safe_float(raw_position.get("cost_basis")) or 0.0
         current_price = self._safe_float(raw_position.get("current_price")) or 0.0
@@ -676,3 +687,16 @@ class RobinhoodAdapter(DataSourceAdapter):
 
         # Default to a far future date if not found
         return "2099-12-31"
+
+    def _resolve_symbol_from_instrument(self, raw_item: dict[str, Any]) -> Optional[str]:
+        """Resolve symbol using instrument URL when robin_stocks omits symbol."""
+        instrument_url = raw_item.get("instrument")
+        if not instrument_url:
+            return None
+        resolver = getattr(self.rh, "get_symbol_by_url", None)
+        if resolver is None or not callable(resolver):
+            raise AttributeError("robin_stocks missing required API for symbol resolution")
+        resolved_symbol = resolver(instrument_url)
+        if resolved_symbol is None:
+            return None
+        return str(resolved_symbol)
