@@ -506,7 +506,7 @@ def sync_positions(source="robinhood"):
 
 ______________________________________________________________________
 
-## Phase 3: Simple CLI Interface ← NEXT
+## Phase 3: Simple CLI Interface ← COMPLETE (core) / EXTENDED WORK IN PROGRESS
 
 **Focus:** Build minimal CLI for testing and validating the application layer. Keep it simple - just enough to login, sync data, and view it.
 
@@ -557,6 +557,75 @@ uv run tradedata sync all        # Everything
 - Thin wrapper - just parse args and call application layer
 - Application layer does all orchestration
 - CLI only handles: arg parsing, user prompts, output formatting
+
+**Extended (done):**
+
+- `sync transactions`/`show transactions` support type filters
+- Enriched, per-type tables for `show transactions` with `--raw` fallback
+- Type filters for both sync/show
+
+**Extended (planned/queued):**
+
+- Full/raw payload visibility and per-transaction detail (issue #53)
+- Convenience queries (`--last N`, `--id/--source-id`)
+
+______________________________________________________________________
+
+## Phase 4: Complete Robinhood Data Capture (NEW)
+
+**Goal:** Ensure all Robinhood-sourced data is ingested, stored, and visible before deeper analytics.
+
+**Scope:**
+
+- Fees/commissions/adjustments: persist on orders/executions where present.
+- Order lifecycle: states (filled/partial/canceled/rejected), last transaction time, extended-hours flags.
+- Stock executions: store per-fill price/qty/timestamp.
+- Option assignments/exercises/expirations: capture explicitly if surfaced; avoid hiding them in raw only.
+- Crypto: consider a dedicated table; store state changes, fees, executions.
+- Dividends/transfers: surface extra fields (withholding/DRIP/ref ids/fees) from raw.
+- Positions enrichment: fetch quotes for `current_price`; derive/validate `cost_basis`; capture option/crypto positions if available; add `--open-only` view.
+- Account/portfolio snapshots: cash, buying power, margin balances/equity if API exposes them.
+- Instrument/fundamentals metadata: names/exchanges/sectors where available.
+- Visibility: CLI detail/raw view so every stored field is reachable.
+
+**Outputs:**
+
+- Schema/repo updates where needed (new tables for crypto/orders/executions/account snapshots if required).
+- Adapter updates to populate the new fields with fail-fast validation.
+- CLI: detail/raw modes to inspect all fields; filters to narrow scope.
+- QA/audit command to report counts, missing required fields, and latest timestamps.
+
+______________________________________________________________________
+
+## Near-Term Focus (before analytics)
+
+1. **Data visibility & detail (issue #53)**
+
+   - Add `--raw-json`/`--all-fields` and per-transaction detail view so every stored field is visible (fees, P/L, account_id, legs, strikes, expirations, quantities, position_effect, etc.).
+   - Add `--last N`/`--id` convenience for “what was my last transaction?”
+
+1. **Positions enrichment & usability**
+
+   - Fetch current quotes to populate `current_price`.
+   - Derive/validate `cost_basis` when missing; fail if critical fields absent.
+   - Add `--open-only` filter (optionally hide zero-quantity positions).
+
+1. **Data QA / audit**
+
+   - Command to report counts per type, missing fields (symbol/fees/P&L), latest timestamps, and gaps.
+   - Optional export (JSON/CSV) for ad-hoc checks.
+
+1. **Option collateral & expiry visibility**
+
+   - Surface secured short put collateral requirements and expiry buckets (e.g., “collateral expiring 2025-12-19”).
+   - Identify candidates to close/roll based on expiry proximity and P/L.
+
+1. **Performance/analytics staging**
+
+   - Lot-level realized/unrealized P&L engine (fees included).
+   - Wash-sale detection.
+   - Option cash-flow and premium tracking.
+   - Benchmark and sector exposure ready for later phases.
 
 **Success Criteria:**
 
