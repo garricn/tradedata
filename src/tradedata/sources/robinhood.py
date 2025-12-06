@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional, Protocol
 
 try:
-    import robin_stocks.robinhood as rh_module  # type: ignore[import-untyped]
+    import robin_stocks.robinhood as rh_module
 except ImportError:
     rh_module = None  # type: ignore
 
