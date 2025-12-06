@@ -117,6 +117,14 @@ class RobinhoodAPIWrapper:
             ],
             "symbol resolution by instrument URL",
         )
+        self._get_dividends = _resolve_callable(
+            [("get_dividends", lambda: getattr(self.rh, "get_dividends", None))],
+            "dividends",
+        )
+        self._get_bank_transfers = _resolve_callable(
+            [("get_bank_transfers", lambda: getattr(self.rh, "get_bank_transfers", None))],
+            "bank transfers",
+        )
 
     def login(self, username: str, password: str) -> dict[str, Any]:
         """Login to Robinhood account."""
@@ -141,6 +149,14 @@ class RobinhoodAPIWrapper:
     def get_symbol_by_url(self, instrument_url: str) -> Optional[str]:
         """Resolve symbol from instrument URL when provided by robin_stocks."""
         return self._get_symbol_by_url(instrument_url)  # type: ignore[no-any-return]
+
+    def get_dividends(self) -> list[dict[str, Any]]:
+        """Get dividends."""
+        return self._get_dividends() or []  # type: ignore[no-any-return]
+
+    def get_bank_transfers(self) -> list[dict[str, Any]]:
+        """Get bank/ACH transfers."""
+        return self._get_bank_transfers() or []  # type: ignore[no-any-return]
 
 
 class RobinhoodAPI(Protocol):
@@ -196,6 +212,14 @@ class RobinhoodAPI(Protocol):
 
     def get_symbol_by_url(self, instrument_url: str) -> Optional[str]:
         """Resolve symbol from instrument URL."""
+        ...
+
+    def get_dividends(self) -> list[dict[str, Any]]:
+        """Get dividend transactions."""
+        ...
+
+    def get_bank_transfers(self) -> list[dict[str, Any]]:
+        """Get bank/ACH transfer transactions."""
         ...
 
 
@@ -272,6 +296,20 @@ class RobinhoodAdapter(DataSourceAdapter):
         option_orders = self.rh.get_all_option_orders()
         if option_orders:
             transactions.extend(option_orders)
+
+        # Get dividends
+        dividends = self.rh.get_dividends()
+        if dividends:
+            for div in dividends:
+                self._assert_required_fields(div, ["id", "amount"], "dividend")
+            transactions.extend(dividends)
+
+        # Get bank/ACH transfers
+        transfers = self.rh.get_bank_transfers()
+        if transfers:
+            for transfer in transfers:
+                self._assert_required_fields(transfer, ["id", "amount", "direction"], "transfer")
+            transactions.extend(transfers)
 
         # Filter by date if provided
         if start_date or end_date:
@@ -403,10 +441,28 @@ class RobinhoodAdapter(DataSourceAdapter):
             Transaction type string (e.g., 'stock', 'option', 'crypto', 'dividend')
         """
         instrument = raw_transaction.get("instrument", "")
+        tx_type_field = str(raw_transaction.get("type", "")).lower()
 
         # Check for option-specific fields
         if "legs" in raw_transaction or "option" in instrument:
             return "option"
+
+        # Check for crypto
+        if "crypto" in tx_type_field:
+            return "crypto"
+
+        # Check for dividend
+        if "dividend" in tx_type_field or "cash_dividend_id" in raw_transaction:
+            return "dividend"
+
+        # Check for transfers (ACH/bank)
+        if (
+            "transfer" in tx_type_field
+            or "ach_relationship" in raw_transaction
+            or "rhs_state" in raw_transaction
+            or "expected_landing_date" in raw_transaction
+        ):
+            return "transfer"
 
         # Check for stock-specific fields
         symbol = raw_transaction.get("symbol")
@@ -419,14 +475,6 @@ class RobinhoodAdapter(DataSourceAdapter):
             raise ValueError(
                 "Stock transaction missing symbol and instrument could not be resolved"
             )
-
-        # Check for crypto
-        if "crypto" in raw_transaction.get("type", "").lower():
-            return "crypto"
-
-        # Check for dividend
-        if "dividend" in raw_transaction.get("type", "").lower():
-            return "dividend"
 
         # Default to 'unknown' if unclear
         return "unknown"
@@ -447,6 +495,10 @@ class RobinhoodAdapter(DataSourceAdapter):
             "last_transaction_at",
             "execution_date",
             "timestamp",
+            "payable_date",
+            "record_date",
+            "expected_landing_datetime",
+            "expected_landing_date",
         ]
 
         for field in timestamp_fields:
@@ -700,3 +752,9 @@ class RobinhoodAdapter(DataSourceAdapter):
         if resolved_symbol is None:
             return None
         return str(resolved_symbol)
+
+    def _assert_required_fields(self, raw_item: dict[str, Any], fields: list[str], label: str):
+        """Ensure required fields are present; fail fast otherwise."""
+        missing = [field for field in fields if not raw_item.get(field)]
+        if missing:
+            raise ValueError(f"{label} missing required fields: {missing}")

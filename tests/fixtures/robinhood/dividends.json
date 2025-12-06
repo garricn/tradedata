@@ -1,0 +1,20 @@
+[
+  {
+    "account": "https://api.robinhood.com/accounts/TESTACCOUNT/",
+    "amount": "3.00",
+    "cash_dividend_id": "div-1",
+    "drip_enabled": false,
+    "id": "dividend-1",
+    "instrument": "https://api.robinhood.com/instruments/FAKE-INSTRUMENT/",
+    "is_primary_account": true,
+    "nra_withholding": "0",
+    "paid_at": null,
+    "payable_date": "2025-12-26",
+    "position": "300.0000",
+    "rate": "0.0100000000",
+    "record_date": "2025-12-05",
+    "state": "pending",
+    "url": "https://api.robinhood.com/dividends/dividend-1/",
+    "withholding": "0.00"
+  }
+]
