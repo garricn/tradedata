@@ -92,3 +92,53 @@ def test_list_positions_returns_all(monkeypatch):
     result = listing.list_positions()
 
     assert result == [position]
+
+
+def test_list_transactions_last_applies_after_filters(monkeypatch):
+    """Ensure list_transactions returns most recent N after filters."""
+    now = datetime.now(timezone.utc)
+    tx_new = Transaction(
+        id="tx-new",
+        source="robinhood",
+        source_id="rh-new",
+        type="stock",
+        created_at=now.isoformat(),
+        account_id=None,
+        raw_data="{}",
+    )
+    tx_mid = Transaction(
+        id="tx-mid",
+        source="robinhood",
+        source_id="rh-mid",
+        type="stock",
+        created_at=(now - timedelta(days=1)).isoformat(),
+        account_id=None,
+        raw_data="{}",
+    )
+    tx_old = Transaction(
+        id="tx-old",
+        source="robinhood",
+        source_id="rh-old",
+        type="stock",
+        created_at=(now - timedelta(days=2)).isoformat(),
+        account_id=None,
+        raw_data="{}",
+    )
+
+    class FakeRepo:
+        def __init__(self, _storage=None):
+            pass
+
+        def find_all(self):
+            return [tx_old, tx_new, tx_mid]
+
+    class FakeStorage:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    monkeypatch.setattr("tradedata.application.listing.TransactionRepository", FakeRepo)
+    monkeypatch.setattr("tradedata.application.listing.Storage", FakeStorage)
+
+    result = listing.list_transactions(transaction_type="stock", last=2)
+
+    assert result == [tx_new, tx_mid]

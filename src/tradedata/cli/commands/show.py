@@ -58,11 +58,21 @@ def show() -> None:
     is_flag=True,
     help="Show the base transaction view instead of enriched, type-specific tables.",
 )
-def show_transactions(transaction_types: tuple[str, ...], days: Optional[int], raw: bool) -> None:
+@click.option(
+    "--last",
+    type=click.IntRange(min=1),
+    help="Show only the most recent N transactions (after other filters).",
+)
+def show_transactions(
+    transaction_types: tuple[str, ...],
+    days: Optional[int],
+    raw: bool,
+    last: Optional[int],
+) -> None:
     """Show stored transactions with optional filters."""
     tx_types = _parse_types_option(transaction_types)
     if raw:
-        transactions = listing.list_transactions(transaction_types=tx_types, days=days)
+        transactions = listing.list_transactions(transaction_types=tx_types, days=days, last=last)
         if not transactions:
             click.echo("No transactions found.")
             return
@@ -78,7 +88,9 @@ def show_transactions(transaction_types: tuple[str, ...], days: Optional[int], r
         click.echo(output)
         return
 
-    tables = listing.list_enriched_transaction_tables(transaction_types=tx_types, days=days)
+    tables = listing.list_enriched_transaction_tables(
+        transaction_types=tx_types, days=days, last=last
+    )
     if not tables:
         click.echo("No transactions found.")
         return

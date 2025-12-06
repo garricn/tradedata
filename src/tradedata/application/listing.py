@@ -42,6 +42,7 @@ def list_transactions(
     transaction_type: Optional[str] = None,
     transaction_types: Optional[list[str]] = None,
     days: Optional[int] = None,
+    last: Optional[int] = None,
     storage: Optional[Storage] = None,
 ) -> list[Transaction]:
     """Return transactions with optional type/days filters."""
@@ -58,6 +59,16 @@ def list_transactions(
             tx for tx in transactions if _within_days(_parse_timestamp(tx.created_at), days)
         ]
 
+    if last is not None:
+        if last < 1:
+            return []
+
+        def _sort_key(tx: Transaction):
+            parsed = _parse_timestamp(tx.created_at)
+            return (parsed or datetime.min.replace(tzinfo=timezone.utc), tx.id)
+
+        transactions = sorted(transactions, key=_sort_key, reverse=True)[:last]
+
     return transactions
 
 
@@ -73,6 +84,7 @@ class TransactionTable:
 def list_enriched_transaction_tables(
     transaction_types: Optional[list[str]] = None,
     days: Optional[int] = None,
+    last: Optional[int] = None,
     storage: Optional[Storage] = None,
 ) -> list[TransactionTable]:
     """Return type-specific enriched transaction tables."""
@@ -80,6 +92,7 @@ def list_enriched_transaction_tables(
     transactions = list_transactions(
         transaction_types=transaction_types,
         days=days,
+        last=last,
         storage=storage,
     )
     if not transactions:

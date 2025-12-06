@@ -199,3 +199,49 @@ def test_show_transactions_raw_flag(tmp_path) -> None:
     assert "ID" in output
     assert "Symbol" not in output
     assert "Stock transactions" not in output
+
+
+def test_show_transactions_last_uses_enriched(monkeypatch):
+    """`--last` should invoke enriched table rendering (non-raw)."""
+
+    calls = {}
+
+    def fake_list_enriched_transaction_tables(transaction_types=None, days=None, last=None):
+        calls["args"] = {
+            "transaction_types": transaction_types,
+            "days": days,
+            "last": last,
+        }
+        return [
+            type(
+                "Table",
+                (),
+                {
+                    "transaction_type": "stock",
+                    "headers": ["Symbol", "Side"],
+                    "rows": [["AAPL", "buy"]],
+                },
+            )()
+        ]
+
+    monkeypatch.setattr(
+        "tradedata.application.listing.list_enriched_transaction_tables",
+        fake_list_enriched_transaction_tables,
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["show", "transactions", "--last", "1"])
+
+    assert result.exit_code == 0
+    assert "AAPL" in result.output
+    assert calls["args"] == {"transaction_types": None, "days": None, "last": 1}
+
+
+def test_show_transactions_last_requires_value(monkeypatch):
+    """`--last` must be given a value (int > 0)."""
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["show", "transactions", "--last"])
+
+    assert result.exit_code != 0
+    assert "Error" in result.output
