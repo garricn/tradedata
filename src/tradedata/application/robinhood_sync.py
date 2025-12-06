@@ -50,6 +50,7 @@ def sync_transactions(
     end_date: Optional[str] = None,
     storage: Optional[Storage] = None,
     adapter=None,
+    types: Optional[list[str]] = None,
 ) -> List[Transaction]:
     """Sync transactions from a source into storage.
 
@@ -66,6 +67,7 @@ def sync_transactions(
         end_date: Optional end date filter (ISO string)
         storage: Optional Storage instance (defaults to configured database)
         adapter: Optional adapter instance (for testing or custom sources)
+        types: Optional list of transaction types to include (e.g., ['stock', 'option'])
 
     Returns:
         List of stored Transaction models.
@@ -95,6 +97,8 @@ def sync_transactions(
     for raw_tx in raw_transactions:
         transaction = adapter.normalize_transaction(raw_tx)
         validate_transaction(transaction)
+        if types and transaction.type not in types:
+            continue
         if tx_repo.exists_by_source_id(transaction.source, transaction.source_id):
             continue
         tx_repo.create(transaction)

@@ -38,18 +38,19 @@ def show() -> None:
 @show.command("transactions")
 @click.option(
     "--type",
-    "transaction_type",
-    type=click.Choice(["stock", "option"]),
-    help="Filter by transaction type.",
+    "transaction_types",
+    multiple=True,
+    help="Filter by transaction types (repeatable, e.g., --type stock --type option).",
 )
 @click.option(
     "--days",
     type=int,
     help="Only include transactions from the past N days.",
 )
-def show_transactions(transaction_type: Optional[str], days: Optional[int]) -> None:
+def show_transactions(transaction_types: tuple[str, ...], days: Optional[int]) -> None:
     """Show stored transactions with optional filters."""
-    transactions = listing.list_transactions(transaction_type=transaction_type, days=days)
+    tx_types = list(transaction_types) if transaction_types else None
+    transactions = listing.list_transactions(transaction_types=tx_types, days=days)
     if not transactions:
         click.echo("No transactions found.")
         return

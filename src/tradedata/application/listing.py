@@ -32,13 +32,18 @@ def _within_days(timestamp: Optional[datetime], days: int) -> bool:
 
 def list_transactions(
     transaction_type: Optional[str] = None,
+    transaction_types: Optional[list[str]] = None,
     days: Optional[int] = None,
     storage: Optional[Storage] = None,
 ) -> list[Transaction]:
     """Return transactions with optional type/days filters."""
     storage = storage or Storage()
     repo = TransactionRepository(storage)
-    transactions = repo.find_by_type(transaction_type) if transaction_type else repo.find_all()
+    types_filter = transaction_types or ([transaction_type] if transaction_type else None)
+    transactions = repo.find_all()
+    if types_filter:
+        types_set = set(types_filter)
+        transactions = [tx for tx in transactions if tx.type in types_set]
 
     if days is not None:
         transactions = [

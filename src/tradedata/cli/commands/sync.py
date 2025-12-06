@@ -16,12 +16,26 @@ def sync() -> None:
 @click.option("--source", default="robinhood", help="Data source name.")
 @click.option("--start-date", help="Optional start date (YYYY-MM-DD).")
 @click.option("--end-date", help="Optional end date (YYYY-MM-DD).")
+@click.option(
+    "--types",
+    "-t",
+    multiple=True,
+    help=(
+        "Repeated transaction types to include (e.g., --types stock --types option --types crypto)."
+    ),
+)
 def sync_transactions(
-    source: str, start_date: Optional[str] = None, end_date: Optional[str] = None
+    source: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    types: Optional[tuple[str, ...]] = None,
 ) -> None:
     """Sync transactions into the local database."""
     transactions = robinhood_sync.sync_transactions(
-        source=source, start_date=start_date, end_date=end_date
+        source=source,
+        start_date=start_date,
+        end_date=end_date,
+        types=list(types) if types else None,
     )
     click.echo(f"Synced {len(transactions)} transactions from {source}.")
 

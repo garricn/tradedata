@@ -23,8 +23,9 @@ def test_show_transactions_invokes_listing(monkeypatch):
 
     captured = {}
 
-    def fake_list_transactions(transaction_type=None, days=None):
+    def fake_list_transactions(transaction_type=None, transaction_types=None, days=None):
         captured["transaction_type"] = transaction_type
+        captured["transaction_types"] = transaction_types
         captured["days"] = days
         return [tx]
 
@@ -34,10 +35,13 @@ def test_show_transactions_invokes_listing(monkeypatch):
     )
 
     runner = CliRunner()
-    result = runner.invoke(cli, ["show", "transactions", "--type", "stock", "--days", "10"])
+    result = runner.invoke(
+        cli,
+        ["show", "transactions", "--type", "stock", "--type", "crypto", "--days", "10"],
+    )
 
     assert result.exit_code == 0
-    assert captured["transaction_type"] == "stock"
+    assert captured["transaction_types"] == ["stock", "crypto"]
     assert captured["days"] == 10
     assert "tx-recent" in result.output
     assert "stock" in result.output
