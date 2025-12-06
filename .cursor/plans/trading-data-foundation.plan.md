@@ -641,7 +641,7 @@ ______________________________________________________________________
 
 **Focus:** Incremental sync, deduplication, and intelligent updates
 
-### 4.1 Incremental Sync
+### 5.1 Incremental Sync
 
 **File:** `src/tradedata/application/incremental_sync.py`
 
@@ -651,7 +651,7 @@ ______________________________________________________________________
 - Detect and resolve conflicts (same transaction from multiple sources)
 - **Note:** Sync and enrichment are separate operations. Sync fetches raw data, enrichment happens separately.
 
-### 4.2 Position Updates
+### 5.2 Position Updates
 
 **File:** `src/tradedata/application/position_tracking.py`
 
@@ -666,7 +666,7 @@ ______________________________________________________________________
 
 **Focus:** Export data in various formats and provide query APIs for other tools
 
-### 5.1 Export Functions
+### 6.1 Export Functions
 
 **File:** `src/tradedata/export/exporters.py`
 
@@ -683,7 +683,7 @@ ______________________________________________________________________
 - Include/exclude enriched data
 - Include/exclude raw data
 
-### 5.2 Transaction Linking
+### 6.2 Transaction Linking
 
 **File:** `src/tradedata/linking/linker.py`
 
@@ -723,7 +723,7 @@ ______________________________________________________________________
 - Multi-leg spread detection
 - Custom linking rules
 
-### 5.3 Query API
+### 6.3 Query API
 
 **File:** `src/tradedata/api/query.py`
 
@@ -749,7 +749,7 @@ ______________________________________________________________________
 
 **⚠️ Important:** Enrichment strategy validation is in progress. See `../rhscrape/docs/ENRICHMENT_CONSTRAINTS.md` for current status. The `enriched_data` schema may need adjustment based on API availability validation.
 
-### 6.1 Enrichment Pipeline
+### 7.1 Enrichment Pipeline
 
 **File:** `src/enrichment/enricher.py`
 
@@ -784,7 +784,7 @@ ______________________________________________________________________
 - Historical stock data: `robin_stocks.stocks.get_historicals()`
 - Technical indicators: Calculate from historical data (pandas-ta or ta-lib)
 
-### 6.2 Greeks Fetcher
+### 7.2 Greeks Fetcher
 
 **File:** `src/enrichment/greeks.py`
 
