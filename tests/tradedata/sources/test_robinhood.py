@@ -30,6 +30,8 @@ class TestRobinhoodAdapter:
         mock_rh.get_all_option_orders = None
         mock_rh.get_open_option_positions = MagicMock(return_value=[])
         mock_rh.get_all_positions = MagicMock(return_value=[])
+        mock_rh.get_dividends = MagicMock(return_value=[])
+        mock_rh.get_bank_transfers = MagicMock(return_value=[])
 
         with pytest.raises(AttributeError) as excinfo:
             RobinhoodAPIWrapper(mock_rh)
@@ -58,6 +60,8 @@ class TestRobinhoodAdapter:
         mock_rh = MagicMock()
         mock_rh.get_all_stock_orders.return_value = self._load_fixture("stock_orders.json")
         mock_rh.get_all_option_orders.return_value = self._load_fixture("option_orders.json")
+        mock_rh.get_dividends.return_value = []
+        mock_rh.get_bank_transfers.return_value = []
 
         adapter = RobinhoodAdapter(robin_stocks=mock_rh)
         transactions = adapter.extract_transactions()
@@ -76,6 +80,8 @@ class TestRobinhoodAdapter:
             {"id": "stock-2", "symbol": "MSFT", "created_at": "2025-02-15T10:00:00Z"},
         ]
         mock_rh.get_all_option_orders.return_value = []
+        mock_rh.get_dividends.return_value = []
+        mock_rh.get_bank_transfers.return_value = []
 
         adapter = RobinhoodAdapter(robin_stocks=mock_rh)
         transactions = adapter.extract_transactions(start_date="2025-01-20", end_date="2025-02-10")
@@ -89,6 +95,8 @@ class TestRobinhoodAdapter:
         mock_rh.orders = MagicMock()
         mock_rh.orders.get_all_stock_orders.return_value = self._load_fixture("stock_orders.json")
         mock_rh.get_all_option_orders.return_value = self._load_fixture("option_orders.json")
+        mock_rh.get_dividends = MagicMock(return_value=[])
+        mock_rh.get_bank_transfers = MagicMock(return_value=[])
         mock_rh.options = MagicMock()
         del mock_rh.options.get_all_option_orders
 
@@ -97,6 +105,51 @@ class TestRobinhoodAdapter:
 
         assert len(transactions) == 2
         mock_rh.get_all_option_orders.assert_called_once()
+
+    def test_extract_transactions_includes_dividends_and_transfers(self):
+        """Dividends and bank transfers should be included and validated."""
+        mock_rh = MagicMock()
+        mock_rh.get_all_stock_orders.return_value = []
+        mock_rh.get_all_option_orders.return_value = []
+        mock_rh.get_dividends.return_value = self._load_fixture("dividends.json")
+        mock_rh.get_bank_transfers.return_value = self._load_fixture("bank_transfers.json")
+
+        adapter = RobinhoodAdapter(robin_stocks=mock_rh)
+        transactions = adapter.extract_transactions()
+
+        assert len(transactions) == 2
+        assert transactions[0]["id"] == "dividend-1"
+        assert transactions[1]["id"] == "transfer-1"
+        mock_rh.get_dividends.assert_called_once()
+        mock_rh.get_bank_transfers.assert_called_once()
+
+    def test_extract_transactions_raises_on_missing_required_dividend_fields(self):
+        """Fail fast when required dividend fields are missing."""
+        mock_rh = MagicMock()
+        mock_rh.get_all_stock_orders.return_value = []
+        mock_rh.get_all_option_orders.return_value = []
+        mock_rh.get_dividends.return_value = [{"amount": "1.00"}]  # id missing
+        mock_rh.get_bank_transfers.return_value = []
+
+        adapter = RobinhoodAdapter(robin_stocks=mock_rh)
+
+        with pytest.raises(ValueError):
+            adapter.extract_transactions()
+
+    def test_extract_transactions_raises_on_missing_required_transfer_fields(self):
+        """Fail fast when required transfer fields are missing."""
+        mock_rh = MagicMock()
+        mock_rh.get_all_stock_orders.return_value = []
+        mock_rh.get_all_option_orders.return_value = []
+        mock_rh.get_dividends.return_value = []
+        mock_rh.get_bank_transfers.return_value = [
+            {"id": "x", "direction": "deposit"}
+        ]  # amount missing
+
+        adapter = RobinhoodAdapter(robin_stocks=mock_rh)
+
+        with pytest.raises(ValueError):
+            adapter.extract_transactions()
 
     def test_extract_positions(self):
         """Test extracting positions from Robinhood API."""
@@ -152,6 +205,8 @@ class TestRobinhoodAdapter:
         mock_rh.stocks.get_symbol_by_url = MagicMock(return_value="AAPL")
         mock_rh.get_open_stock_positions.return_value = []
         mock_rh.get_all_positions.return_value = option_positions
+        mock_rh.get_dividends = MagicMock(return_value=[])
+        mock_rh.get_bank_transfers = MagicMock(return_value=[])
 
         adapter = RobinhoodAdapter(robin_stocks=RobinhoodAPIWrapper(mock_rh))
 
