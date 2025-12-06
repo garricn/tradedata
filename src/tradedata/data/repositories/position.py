@@ -23,10 +23,22 @@ class PositionRepository(BaseRepository[Position]):
             return None
         return Position.from_db_row(row)
 
-    def create(self, entity: Position) -> Position:
+    def create(self, entity: Position, conn=None) -> Position:
         """Create a new position."""
-        with self.storage.transaction() as conn:
+        if conn is not None:
             conn.execute(
+                """
+                INSERT INTO positions
+                    (id, source, symbol, quantity, cost_basis, current_price,
+                     unrealized_pnl, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                entity.to_db_tuple(),
+            )
+            return entity
+
+        with self.storage.transaction() as tx_conn:
+            tx_conn.execute(
                 """
                 INSERT INTO positions
                     (id, source, symbol, quantity, cost_basis, current_price,
@@ -37,9 +49,19 @@ class PositionRepository(BaseRepository[Position]):
             )
         return entity
 
-    def update(self, entity: Position) -> Position:
+    def update(self, entity: Position, conn=None) -> Position:
         """Update an existing position."""
-        with self.storage.transaction() as conn:
+        params = (
+            entity.source,
+            entity.symbol,
+            entity.quantity,
+            entity.cost_basis,
+            entity.current_price,
+            entity.unrealized_pnl,
+            entity.last_updated,
+            entity.id,
+        )
+        if conn is not None:
             conn.execute(
                 """
                 UPDATE positions
@@ -47,23 +69,30 @@ class PositionRepository(BaseRepository[Position]):
                     current_price = ?, unrealized_pnl = ?, last_updated = ?
                 WHERE id = ?
                 """,
-                (
-                    entity.source,
-                    entity.symbol,
-                    entity.quantity,
-                    entity.cost_basis,
-                    entity.current_price,
-                    entity.unrealized_pnl,
-                    entity.last_updated,
-                    entity.id,
-                ),
+                params,
+            )
+            return entity
+
+        with self.storage.transaction() as tx_conn:
+            tx_conn.execute(
+                """
+                UPDATE positions
+                SET source = ?, symbol = ?, quantity = ?, cost_basis = ?,
+                    current_price = ?, unrealized_pnl = ?, last_updated = ?
+                WHERE id = ?
+                """,
+                params,
             )
         return entity
 
-    def delete(self, entity_id: str) -> bool:
+    def delete(self, entity_id: str, conn=None) -> bool:
         """Delete a position by ID."""
-        with self.storage.transaction() as conn:
+        if conn is not None:
             cursor = conn.execute("DELETE FROM positions WHERE id = ?", (entity_id,))
+            return bool(cursor.rowcount > 0)
+
+        with self.storage.transaction() as tx_conn:
+            cursor = tx_conn.execute("DELETE FROM positions WHERE id = ?", (entity_id,))
             return bool(cursor.rowcount > 0)
 
     def find_all(self) -> list[Position]:

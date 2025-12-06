@@ -22,10 +22,22 @@ class TransactionLinkRepository(BaseRepository[TransactionLink]):
             return None
         return TransactionLink.from_db_row(row)
 
-    def create(self, entity: TransactionLink) -> TransactionLink:
+    def create(self, entity: TransactionLink, conn=None) -> TransactionLink:
         """Create a new transaction link."""
-        with self.storage.transaction() as conn:
+        if conn is not None:
             conn.execute(
+                """
+                INSERT INTO transaction_links
+                    (id, opening_transaction_id, closing_transaction_id,
+                     link_type, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                entity.to_db_tuple(),
+            )
+            return entity
+
+        with self.storage.transaction() as tx_conn:
+            tx_conn.execute(
                 """
                 INSERT INTO transaction_links
                     (id, opening_transaction_id, closing_transaction_id,
@@ -36,9 +48,16 @@ class TransactionLinkRepository(BaseRepository[TransactionLink]):
             )
         return entity
 
-    def update(self, entity: TransactionLink) -> TransactionLink:
+    def update(self, entity: TransactionLink, conn=None) -> TransactionLink:
         """Update an existing transaction link."""
-        with self.storage.transaction() as conn:
+        params = (
+            entity.opening_transaction_id,
+            entity.closing_transaction_id,
+            entity.link_type,
+            entity.created_at,
+            entity.id,
+        )
+        if conn is not None:
             conn.execute(
                 """
                 UPDATE transaction_links
@@ -46,20 +65,30 @@ class TransactionLinkRepository(BaseRepository[TransactionLink]):
                     link_type = ?, created_at = ?
                 WHERE id = ?
                 """,
-                (
-                    entity.opening_transaction_id,
-                    entity.closing_transaction_id,
-                    entity.link_type,
-                    entity.created_at,
-                    entity.id,
-                ),
+                params,
+            )
+            return entity
+
+        with self.storage.transaction() as tx_conn:
+            tx_conn.execute(
+                """
+                UPDATE transaction_links
+                SET opening_transaction_id = ?, closing_transaction_id = ?,
+                    link_type = ?, created_at = ?
+                WHERE id = ?
+                """,
+                params,
             )
         return entity
 
-    def delete(self, entity_id: str) -> bool:
+    def delete(self, entity_id: str, conn=None) -> bool:
         """Delete a transaction link by ID."""
-        with self.storage.transaction() as conn:
+        if conn is not None:
             cursor = conn.execute("DELETE FROM transaction_links WHERE id = ?", (entity_id,))
+            return bool(cursor.rowcount > 0)
+
+        with self.storage.transaction() as tx_conn:
+            cursor = tx_conn.execute("DELETE FROM transaction_links WHERE id = ?", (entity_id,))
             return bool(cursor.rowcount > 0)
 
     def find_all(self) -> list[TransactionLink]:

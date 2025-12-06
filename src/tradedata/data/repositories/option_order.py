@@ -23,10 +23,22 @@ class OptionOrderRepository(BaseRepository[OptionOrder]):
             return None
         return OptionOrder.from_db_row(row)
 
-    def create(self, entity: OptionOrder) -> OptionOrder:
+    def create(self, entity: OptionOrder, conn=None) -> OptionOrder:
         """Create a new option order."""
-        with self.storage.transaction() as conn:
+        if conn is not None:
             conn.execute(
+                """
+                INSERT INTO option_orders
+                    (id, chain_symbol, opening_strategy, closing_strategy,
+                     direction, premium, net_amount)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                entity.to_db_tuple(),
+            )
+            return entity
+
+        with self.storage.transaction() as tx_conn:
+            tx_conn.execute(
                 """
                 INSERT INTO option_orders
                     (id, chain_symbol, opening_strategy, closing_strategy,
@@ -37,9 +49,18 @@ class OptionOrderRepository(BaseRepository[OptionOrder]):
             )
         return entity
 
-    def update(self, entity: OptionOrder) -> OptionOrder:
+    def update(self, entity: OptionOrder, conn=None) -> OptionOrder:
         """Update an existing option order."""
-        with self.storage.transaction() as conn:
+        params = (
+            entity.chain_symbol,
+            entity.opening_strategy,
+            entity.closing_strategy,
+            entity.direction,
+            entity.premium,
+            entity.net_amount,
+            entity.id,
+        )
+        if conn is not None:
             conn.execute(
                 """
                 UPDATE option_orders
@@ -47,22 +68,30 @@ class OptionOrderRepository(BaseRepository[OptionOrder]):
                     direction = ?, premium = ?, net_amount = ?
                 WHERE id = ?
                 """,
-                (
-                    entity.chain_symbol,
-                    entity.opening_strategy,
-                    entity.closing_strategy,
-                    entity.direction,
-                    entity.premium,
-                    entity.net_amount,
-                    entity.id,
-                ),
+                params,
+            )
+            return entity
+
+        with self.storage.transaction() as tx_conn:
+            tx_conn.execute(
+                """
+                UPDATE option_orders
+                SET chain_symbol = ?, opening_strategy = ?, closing_strategy = ?,
+                    direction = ?, premium = ?, net_amount = ?
+                WHERE id = ?
+                """,
+                params,
             )
         return entity
 
-    def delete(self, entity_id: str) -> bool:
+    def delete(self, entity_id: str, conn=None) -> bool:
         """Delete an option order by ID."""
-        with self.storage.transaction() as conn:
+        if conn is not None:
             cursor = conn.execute("DELETE FROM option_orders WHERE id = ?", (entity_id,))
+            return bool(cursor.rowcount > 0)
+
+        with self.storage.transaction() as tx_conn:
+            cursor = tx_conn.execute("DELETE FROM option_orders WHERE id = ?", (entity_id,))
             return bool(cursor.rowcount > 0)
 
     def find_all(self) -> list[OptionOrder]:

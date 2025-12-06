@@ -22,10 +22,21 @@ class ExecutionRepository(BaseRepository[Execution]):
             return None
         return Execution.from_db_row(row)
 
-    def create(self, entity: Execution) -> Execution:
+    def create(self, entity: Execution, conn=None) -> Execution:
         """Create a new execution."""
-        with self.storage.transaction() as conn:
+        if conn is not None:
             conn.execute(
+                """
+                INSERT INTO executions
+                    (id, order_id, leg_id, price, quantity, timestamp, settlement_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                entity.to_db_tuple(),
+            )
+            return entity
+
+        with self.storage.transaction() as tx_conn:
+            tx_conn.execute(
                 """
                 INSERT INTO executions
                     (id, order_id, leg_id, price, quantity, timestamp, settlement_date)
@@ -35,9 +46,18 @@ class ExecutionRepository(BaseRepository[Execution]):
             )
         return entity
 
-    def update(self, entity: Execution) -> Execution:
+    def update(self, entity: Execution, conn=None) -> Execution:
         """Update an existing execution."""
-        with self.storage.transaction() as conn:
+        params = (
+            entity.order_id,
+            entity.leg_id,
+            entity.price,
+            entity.quantity,
+            entity.timestamp,
+            entity.settlement_date,
+            entity.id,
+        )
+        if conn is not None:
             conn.execute(
                 """
                 UPDATE executions
@@ -45,22 +65,30 @@ class ExecutionRepository(BaseRepository[Execution]):
                     timestamp = ?, settlement_date = ?
                 WHERE id = ?
                 """,
-                (
-                    entity.order_id,
-                    entity.leg_id,
-                    entity.price,
-                    entity.quantity,
-                    entity.timestamp,
-                    entity.settlement_date,
-                    entity.id,
-                ),
+                params,
+            )
+            return entity
+
+        with self.storage.transaction() as tx_conn:
+            tx_conn.execute(
+                """
+                UPDATE executions
+                SET order_id = ?, leg_id = ?, price = ?, quantity = ?,
+                    timestamp = ?, settlement_date = ?
+                WHERE id = ?
+                """,
+                params,
             )
         return entity
 
-    def delete(self, entity_id: str) -> bool:
+    def delete(self, entity_id: str, conn=None) -> bool:
         """Delete an execution by ID."""
-        with self.storage.transaction() as conn:
+        if conn is not None:
             cursor = conn.execute("DELETE FROM executions WHERE id = ?", (entity_id,))
+            return bool(cursor.rowcount > 0)
+
+        with self.storage.transaction() as tx_conn:
+            cursor = tx_conn.execute("DELETE FROM executions WHERE id = ?", (entity_id,))
             return bool(cursor.rowcount > 0)
 
     def find_all(self) -> list[Execution]:

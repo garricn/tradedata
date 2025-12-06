@@ -195,6 +195,41 @@ def test_sync_transactions_filters_types(monkeypatch):
     assert len(tx_repo.find_all()) == 1
 
 
+def test_sync_transactions_is_atomic(monkeypatch):
+    """Ensure partial writes are rolled back when a child insert fails."""
+    storage = Storage(db_path=":memory:")
+    adapter = FakeAdapter()
+    monkeypatch.setattr(
+        robinhood_sync.credentials,
+        "get_credentials",
+        lambda source: ("user", "pw"),
+    )
+
+    def fail_create(self, entity, conn=None):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(OptionLegRepository, "create", fail_create)
+
+    with pytest.raises(RuntimeError):
+        robinhood_sync.sync_transactions(
+            source="robinhood",
+            storage=storage,
+            adapter=adapter,
+        )
+
+    tx_repo = TransactionRepository(storage)
+    option_repo = OptionOrderRepository(storage)
+    leg_repo = OptionLegRepository(storage)
+    execution_repo = ExecutionRepository(storage)
+    stock_repo = StockOrderRepository(storage)
+
+    assert len(tx_repo.find_all()) == 0
+    assert len(option_repo.find_all()) == 0
+    assert len(leg_repo.find_all()) == 0
+    assert len(execution_repo.find_all()) == 0
+    assert len(stock_repo.find_all()) == 0
+
+
 def test_sync_transactions_uses_factory_when_adapter_not_provided(monkeypatch):
     """Ensure factory creation and login are invoked when adapter is omitted."""
     mock_adapter = MagicMock()
