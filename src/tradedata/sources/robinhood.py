@@ -351,7 +351,8 @@ class RobinhoodAdapter(DataSourceAdapter):
             return "option"
 
         # Check for stock-specific fields
-        if "symbol" in raw_transaction and "option" not in raw_transaction.get("instrument", ""):
+        symbol = raw_transaction.get("symbol")
+        if symbol and "option" not in raw_transaction.get("instrument", ""):
             return "stock"
 
         # Check for crypto
@@ -362,8 +363,8 @@ class RobinhoodAdapter(DataSourceAdapter):
         if "dividend" in raw_transaction.get("type", "").lower():
             return "dividend"
 
-        # Default to 'stock' if unclear
-        return "stock"
+        # Default to 'unknown' if unclear
+        return "unknown"
 
     def _extract_timestamp(self, raw_transaction: dict[str, Any]) -> str:
         """Extract ISO timestamp from raw transaction.
@@ -532,7 +533,7 @@ class RobinhoodAdapter(DataSourceAdapter):
         # Extract stock order fields
         symbol = raw_transaction.get("symbol", "")
         if not symbol:
-            raise ValueError("Stock order is missing symbol")
+            return None
         side = raw_transaction.get("side", "").lower()
         quantity = self._safe_float(raw_transaction.get("quantity", 0)) or 0.0
         price = self._safe_float(raw_transaction.get("price")) or 0.0
