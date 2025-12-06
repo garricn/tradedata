@@ -587,6 +587,7 @@ ______________________________________________________________________
 - Account/portfolio snapshots: cash, buying power, margin balances/equity if API exposes them.
 - Instrument/fundamentals metadata: names/exchanges/sectors where available.
 - Visibility: CLI detail/raw view so every stored field is reachable.
+- Tax lot selection: capture `tax_lot_selection_type` (FIFO/LIFO/specific ID) and selected lot details when available.
 
 **Outputs:**
 
@@ -636,7 +637,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## Phase 4: Data Sync & Updates
+## Phase 5: Data Sync & Updates
 
 **Focus:** Incremental sync, deduplication, and intelligent updates
 
@@ -661,7 +662,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## Phase 5: Data Export & APIs
+## Phase 6: Data Export & APIs
 
 **Focus:** Export data in various formats and provide query APIs for other tools
 
@@ -742,7 +743,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## Phase 6: Data Enrichment
+## Phase 7: Data Enrichment
 
 **Focus:** Add historical market data enrichment for analytics (Greeks, IV, technical indicators at trade time)
 
