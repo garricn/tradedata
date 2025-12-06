@@ -3,8 +3,6 @@
 import json
 from unittest.mock import MagicMock
 
-import pytest
-
 from tradedata.sources.robinhood import RobinhoodAdapter, RobinhoodAPIWrapper
 
 
@@ -290,8 +288,8 @@ class TestRobinhoodAdapter:
         assert stock_order.price == 150.0
         assert stock_order.average_price == 150.5
 
-    def test_extract_stock_order_missing_symbol_raises(self):
-        """StockOrder extraction should fail when symbol is missing."""
+    def test_extract_stock_order_missing_symbol_returns_none(self):
+        """StockOrder extraction skips when symbol is missing."""
         raw_tx = {
             "id": "rh-stock-123",
             "side": "buy",
@@ -304,8 +302,7 @@ class TestRobinhoodAdapter:
         adapter = RobinhoodAdapter(robin_stocks=mock_rh)
         transaction = adapter.normalize_transaction(raw_tx)
 
-        with pytest.raises(ValueError):
-            adapter.extract_stock_order(raw_tx, transaction.id)
+        assert adapter.extract_stock_order(raw_tx, transaction.id) is None
 
     def test_normalize_position(self):
         """Test normalizing a position."""
@@ -377,6 +374,10 @@ class TestRobinhoodAdapter:
         # Stock transaction
         stock_tx = {"symbol": "AAPL"}
         assert adapter._determine_transaction_type(stock_tx) == "stock"
+
+        # Unknown transaction defaults to 'unknown'
+        unknown_tx = {"id": "foo"}
+        assert adapter._determine_transaction_type(unknown_tx) == "unknown"
 
         # Crypto transaction
         crypto_tx = {"type": "crypto_purchase"}
