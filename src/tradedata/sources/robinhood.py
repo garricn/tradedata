@@ -50,15 +50,41 @@ class RobinhoodAPIWrapper:
 
     def get_all_option_orders(self) -> list[dict[str, Any]]:
         """Get all option orders via options.get_all_option_orders()."""
-        return self.rh.options.get_all_option_orders() or []  # type: ignore[no-any-return]
+        if hasattr(self.rh, "options") and hasattr(self.rh.options, "get_all_option_orders"):
+            return self.rh.options.get_all_option_orders() or []  # type: ignore[no-any-return]
+        if hasattr(self.rh, "get_all_option_orders"):
+            return self.rh.get_all_option_orders() or []  # type: ignore[no-any-return]
+        raise AttributeError("robin_stocks.robinhood options get_all_option_orders not available")
 
     def get_open_stock_positions(self) -> list[dict[str, Any]]:
         """Get open stock positions via stocks.get_all_stock_positions()."""
-        return self.rh.stocks.get_all_stock_positions() or []  # type: ignore[no-any-return]
+        if hasattr(self.rh, "stocks") and hasattr(self.rh.stocks, "get_all_stock_positions"):
+            return self.rh.stocks.get_all_stock_positions() or []  # type: ignore[no-any-return]
+        if hasattr(self.rh, "get_open_stock_positions"):
+            return self.rh.get_open_stock_positions() or []  # type: ignore[no-any-return]
+        if hasattr(self.rh, "get_all_positions"):
+            # Fall back to combined positions if stock-only endpoint missing
+            return self.rh.get_all_positions() or []  # type: ignore[no-any-return]
+        raise AttributeError("robin_stocks.robinhood stock positions API not available")
 
     def get_open_option_positions(self) -> list[dict[str, Any]]:
         """Get open option positions via options.get_all_option_positions()."""
-        return self.rh.options.get_all_option_positions() or []  # type: ignore[no-any-return]
+        if hasattr(self.rh, "options") and hasattr(self.rh.options, "get_all_option_positions"):
+            return self.rh.options.get_all_option_positions() or []  # type: ignore[no-any-return]
+        if hasattr(self.rh, "get_open_option_positions"):
+            return self.rh.get_open_option_positions() or []  # type: ignore[no-any-return]
+        if hasattr(self.rh, "get_all_positions"):
+            # Fall back to combined positions if option-only endpoint missing
+            return self.rh.get_all_positions() or []  # type: ignore[no-any-return]
+        raise AttributeError("robin_stocks.robinhood option positions API not available")
+
+    def get_symbol_by_url(self, instrument_url: str) -> Optional[str]:
+        """Resolve symbol from instrument URL when provided by robin_stocks."""
+        if hasattr(self.rh, "stocks") and hasattr(self.rh.stocks, "get_symbol_by_url"):
+            return self.rh.stocks.get_symbol_by_url(instrument_url)  # type: ignore[no-any-return]
+        if hasattr(self.rh, "get_symbol_by_url"):
+            return self.rh.get_symbol_by_url(instrument_url)  # type: ignore[no-any-return]
+        return None
 
 
 class RobinhoodAPI(Protocol):
@@ -110,6 +136,10 @@ class RobinhoodAPI(Protocol):
         Returns:
             List of option position dictionaries
         """
+        ...
+
+    def get_symbol_by_url(self, instrument_url: str) -> Optional[str]:
+        """Resolve symbol from instrument URL."""
         ...
 
 
@@ -527,7 +557,13 @@ class RobinhoodAdapter(DataSourceAdapter):
             Position model instance with normalized data.
         """
         position_id = str(uuid.uuid4())
-        symbol = raw_position.get("symbol", "")
+        symbol = raw_position.get("symbol") or raw_position.get("chain_symbol") or ""
+        if not symbol:
+            instrument_url = raw_position.get("instrument")
+            if instrument_url:
+                resolved = self.rh.get_symbol_by_url(instrument_url)
+                if resolved:
+                    symbol = resolved
         quantity = self._safe_float(raw_position.get("quantity", 0)) or 0.0
         cost_basis = self._safe_float(raw_position.get("cost_basis")) or 0.0
         current_price = self._safe_float(raw_position.get("current_price")) or 0.0
