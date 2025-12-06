@@ -26,8 +26,8 @@ def _table(headers: list[str], rows: Iterable[list[str]]) -> str:
         record=True,
     )
     console.print(table)
-    output = console.export_text()
-    return str(output)
+    output = console.export_text(clear=False)
+    return str(output).rstrip()
 
 
 @click.group(name="show")
