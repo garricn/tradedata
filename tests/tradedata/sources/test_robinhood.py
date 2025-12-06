@@ -321,6 +321,7 @@ class TestRobinhoodAdapter:
         """StockOrder extraction should fail when symbol is missing."""
         raw_tx = {
             "id": "rh-stock-123",
+            "instrument": "https://api.robinhood.com/instruments/missing/",
             "side": "buy",
             "quantity": "10.0",
             "price": "150.0",
@@ -328,10 +329,31 @@ class TestRobinhoodAdapter:
         }
 
         mock_rh = MagicMock()
+        mock_rh.get_symbol_by_url = MagicMock(return_value=None)
+        adapter = RobinhoodAdapter(robin_stocks=mock_rh)
+
+        with pytest.raises(ValueError):
+            adapter.normalize_transaction(raw_tx)
+
+    def test_extract_stock_order_resolves_symbol_from_instrument(self):
+        """StockOrder should resolve symbol via instrument URL when symbol is absent."""
+        raw_tx = {
+            "id": "rh-stock-456",
+            "instrument": "https://api.robinhood.com/instruments/msft/",
+            "side": "buy",
+            "quantity": "1.0",
+            "price": "100.0",
+        }
+
+        mock_rh = MagicMock()
+        mock_rh.get_symbol_by_url = MagicMock(return_value="MSFT")
         adapter = RobinhoodAdapter(robin_stocks=mock_rh)
         transaction = adapter.normalize_transaction(raw_tx)
 
-        assert adapter.extract_stock_order(raw_tx, transaction.id) is None
+        stock_order = adapter.extract_stock_order(raw_tx, transaction.id)
+
+        assert stock_order is not None
+        assert stock_order.symbol == "MSFT"
 
     def test_normalize_position(self):
         """Test normalizing a position."""
@@ -391,9 +413,27 @@ class TestRobinhoodAdapter:
 
         assert position.symbol == "AVGO"
 
+    def test_normalize_position_raises_when_symbol_unresolved(self):
+        """Fail when neither symbol nor chain_symbol nor instrument resolution is available."""
+        mock_rh = MagicMock()
+        mock_rh.get_symbol_by_url = MagicMock(return_value=None)
+        adapter = RobinhoodAdapter(robin_stocks=mock_rh)
+        raw_position = {
+            "instrument": "https://api.robinhood.com/instruments/missing/",
+            "quantity": "1.0",
+            "cost_basis": "1.0",
+            "current_price": "2.0",
+            "unrealized_pnl": "1.0",
+            "updated_at": "2025-02-01T00:00:00Z",
+        }
+
+        with pytest.raises(ValueError):
+            adapter.normalize_position(raw_position)
+
     def test_determine_transaction_type(self):
         """Test determining transaction type from raw data."""
         mock_rh = MagicMock()
+        mock_rh.get_symbol_by_url = MagicMock(return_value="AAPL")
         adapter = RobinhoodAdapter(robin_stocks=mock_rh)
 
         # Option transaction
@@ -403,6 +443,10 @@ class TestRobinhoodAdapter:
         # Stock transaction
         stock_tx = {"symbol": "AAPL"}
         assert adapter._determine_transaction_type(stock_tx) == "stock"
+
+        # Stock via instrument resolution
+        stock_tx_via_instrument = {"instrument": "https://api.robinhood.com/instruments/aapl/"}
+        assert adapter._determine_transaction_type(stock_tx_via_instrument) == "stock"
 
         # Crypto transaction
         crypto_tx = {"type": "crypto_purchase"}
