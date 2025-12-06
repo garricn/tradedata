@@ -1,0 +1,21 @@
+[
+  {
+    "id": "crypto-order-1",
+    "currency_code": "BTC",
+    "side": "buy",
+    "quantity": "0.010000000000000000",
+    "average_price": "30000.00",
+    "price": "30000.00",
+    "state": "filled",
+    "created_at": "2025-07-27T00:18:04.518005-04:00",
+    "last_transaction_at": "2025-07-27T00:18:05.636587-04:00",
+    "executions": [
+      {
+        "id": "crypto-exec-1",
+        "quantity": "0.010000000000000000",
+        "effective_price": "30000.00",
+        "timestamp": "2025-07-27T00:18:04.763000-04:00"
+      }
+    ]
+  }
+]
