@@ -6,7 +6,7 @@ Extracts and normalizes trading data from Robinhood API using robin_stocks libra
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional, Protocol
+from typing import Any, Callable, Optional, Protocol, cast
 
 try:
     import robin_stocks.robinhood as rh_module
@@ -53,110 +53,141 @@ class RobinhoodAPIWrapper:
                 f"Expected one of: {[name for name, _ in candidates]}"
             )
 
-        self._get_stock_orders = _resolve_callable(
-            [
-                (
-                    "orders.get_all_stock_orders",
-                    lambda: getattr(getattr(self.rh, "orders", None), "get_all_stock_orders", None),
-                ),
-                ("get_all_stock_orders", lambda: getattr(self.rh, "get_all_stock_orders", None)),
-            ],
-            "stock orders",
-        )
-        self._get_option_orders = _resolve_callable(
-            [
-                (
-                    "options.get_all_option_orders",
-                    lambda: getattr(
-                        getattr(self.rh, "options", None), "get_all_option_orders", None
+        self._get_stock_orders: Callable[[], list[dict[str, Any]]] = cast(
+            Callable[[], list[dict[str, Any]]],
+            _resolve_callable(
+                [
+                    (
+                        "orders.get_all_stock_orders",
+                        lambda: getattr(
+                            getattr(self.rh, "orders", None), "get_all_stock_orders", None
+                        ),
                     ),
-                ),
-                ("get_all_option_orders", lambda: getattr(self.rh, "get_all_option_orders", None)),
-            ],
-            "option orders",
-        )
-        self._get_stock_positions = _resolve_callable(
-            [
-                (
-                    "stocks.get_all_stock_positions",
-                    lambda: getattr(
-                        getattr(self.rh, "stocks", None), "get_all_stock_positions", None
+                    (
+                        "get_all_stock_orders",
+                        lambda: getattr(self.rh, "get_all_stock_orders", None),
                     ),
-                ),
-                (
-                    "get_open_stock_positions",
-                    lambda: getattr(self.rh, "get_open_stock_positions", None),
-                ),
-                ("get_all_positions", lambda: getattr(self.rh, "get_all_positions", None)),
-            ],
-            "stock positions",
+                ],
+                "stock orders",
+            ),
         )
-        self._get_option_positions = _resolve_callable(
-            [
-                (
-                    "options.get_all_option_positions",
-                    lambda: getattr(
-                        getattr(self.rh, "options", None), "get_all_option_positions", None
+        self._get_option_orders: Callable[[], list[dict[str, Any]]] = cast(
+            Callable[[], list[dict[str, Any]]],
+            _resolve_callable(
+                [
+                    (
+                        "options.get_all_option_orders",
+                        lambda: getattr(
+                            getattr(self.rh, "options", None), "get_all_option_orders", None
+                        ),
                     ),
-                ),
-                (
-                    "get_open_option_positions",
-                    lambda: getattr(self.rh, "get_open_option_positions", None),
-                ),
-                ("get_all_positions", lambda: getattr(self.rh, "get_all_positions", None)),
-            ],
-            "option positions",
+                    (
+                        "get_all_option_orders",
+                        lambda: getattr(self.rh, "get_all_option_orders", None),
+                    ),
+                ],
+                "option orders",
+            ),
         )
-        self._get_symbol_by_url = _resolve_callable(
-            [
-                (
-                    "stocks.get_symbol_by_url",
-                    lambda: getattr(getattr(self.rh, "stocks", None), "get_symbol_by_url", None),
-                ),
-                ("get_symbol_by_url", lambda: getattr(self.rh, "get_symbol_by_url", None)),
-            ],
-            "symbol resolution by instrument URL",
+        self._get_stock_positions: Callable[[], list[dict[str, Any]]] = cast(
+            Callable[[], list[dict[str, Any]]],
+            _resolve_callable(
+                [
+                    (
+                        "stocks.get_all_stock_positions",
+                        lambda: getattr(
+                            getattr(self.rh, "stocks", None), "get_all_stock_positions", None
+                        ),
+                    ),
+                    (
+                        "get_open_stock_positions",
+                        lambda: getattr(self.rh, "get_open_stock_positions", None),
+                    ),
+                    ("get_all_positions", lambda: getattr(self.rh, "get_all_positions", None)),
+                ],
+                "stock positions",
+            ),
         )
-        self._get_dividends = _resolve_callable(
-            [("get_dividends", lambda: getattr(self.rh, "get_dividends", None))],
-            "dividends",
+        self._get_option_positions: Callable[[], list[dict[str, Any]]] = cast(
+            Callable[[], list[dict[str, Any]]],
+            _resolve_callable(
+                [
+                    (
+                        "options.get_all_option_positions",
+                        lambda: getattr(
+                            getattr(self.rh, "options", None), "get_all_option_positions", None
+                        ),
+                    ),
+                    (
+                        "get_open_option_positions",
+                        lambda: getattr(self.rh, "get_open_option_positions", None),
+                    ),
+                    ("get_all_positions", lambda: getattr(self.rh, "get_all_positions", None)),
+                ],
+                "option positions",
+            ),
         )
-        self._get_bank_transfers = _resolve_callable(
-            [("get_bank_transfers", lambda: getattr(self.rh, "get_bank_transfers", None))],
-            "bank transfers",
+        self._get_symbol_by_url: Callable[[str], Optional[str]] = cast(
+            Callable[[str], Optional[str]],
+            _resolve_callable(
+                [
+                    (
+                        "stocks.get_symbol_by_url",
+                        lambda: getattr(
+                            getattr(self.rh, "stocks", None), "get_symbol_by_url", None
+                        ),
+                    ),
+                    ("get_symbol_by_url", lambda: getattr(self.rh, "get_symbol_by_url", None)),
+                ],
+                "symbol resolution by instrument URL",
+            ),
+        )
+        self._get_dividends: Callable[[], list[dict[str, Any]]] = cast(
+            Callable[[], list[dict[str, Any]]],
+            _resolve_callable(
+                [("get_dividends", lambda: getattr(self.rh, "get_dividends", None))],
+                "dividends",
+            ),
+        )
+        self._get_bank_transfers: Callable[[], list[dict[str, Any]]] = cast(
+            Callable[[], list[dict[str, Any]]],
+            _resolve_callable(
+                [("get_bank_transfers", lambda: getattr(self.rh, "get_bank_transfers", None))],
+                "bank transfers",
+            ),
         )
 
     def login(self, username: str, password: str) -> dict[str, Any]:
         """Login to Robinhood account."""
-        return self.rh.login(username, password)  # type: ignore[no-any-return]
+        return cast(dict[str, Any], self.rh.login(username, password))
 
     def get_all_stock_orders(self) -> list[dict[str, Any]]:
         """Get all stock orders via orders.get_all_stock_orders()."""
-        return self._get_stock_orders() or []  # type: ignore[no-any-return]
+        return self._get_stock_orders() or []
 
     def get_all_option_orders(self) -> list[dict[str, Any]]:
         """Get all option orders via options.get_all_option_orders()."""
-        return self._get_option_orders() or []  # type: ignore[no-any-return]
+        return self._get_option_orders() or []
 
     def get_open_stock_positions(self) -> list[dict[str, Any]]:
         """Get open stock positions via stocks.get_all_stock_positions()."""
-        return self._get_stock_positions() or []  # type: ignore[no-any-return]
+        return self._get_stock_positions() or []
 
     def get_open_option_positions(self) -> list[dict[str, Any]]:
         """Get open option positions via options.get_all_option_positions()."""
-        return self._get_option_positions() or []  # type: ignore[no-any-return]
+        return self._get_option_positions() or []
 
     def get_symbol_by_url(self, instrument_url: str) -> Optional[str]:
         """Resolve symbol from instrument URL when provided by robin_stocks."""
-        return self._get_symbol_by_url(instrument_url)  # type: ignore[no-any-return]
+        return self._get_symbol_by_url(instrument_url)
 
     def get_dividends(self) -> list[dict[str, Any]]:
         """Get dividends."""
-        return self._get_dividends() or []  # type: ignore[no-any-return]
+        return self._get_dividends() or []
 
     def get_bank_transfers(self) -> list[dict[str, Any]]:
         """Get bank/ACH transfers."""
-        return self._get_bank_transfers() or []  # type: ignore[no-any-return]
+        return self._get_bank_transfers() or []
 
 
 class RobinhoodAPI(Protocol):
@@ -253,15 +284,11 @@ class RobinhoodAdapter(DataSourceAdapter):
         """
         self.username = username
         self.password = password
-        # Use injected implementation or create wrapper for default robin_stocks module
         if robin_stocks is not None:
-            self.rh: RobinhoodAPI = robin_stocks  # type: ignore[assignment]
+            self.rh: RobinhoodAPI = robin_stocks
         elif rh_module is not None:
-            self.rh = RobinhoodAPIWrapper(rh_module)  # type: ignore[assignment]
+            self.rh = RobinhoodAPIWrapper(rh_module)
         else:
-            self.rh = None  # type: ignore[assignment]
-
-        if self.rh is None:
             raise ImportError(
                 "robin_stocks is not installed. Install it with: pip install robin-stocks"
             )
