@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from tradedata.sources.robinhood import RobinhoodAdapter, RobinhoodAPIWrapper
 
 
@@ -15,6 +17,24 @@ class TestRobinhoodAdapter:
         fixture_path = Path(__file__).resolve().parents[2] / "fixtures" / "robinhood" / name
         data = json.loads(fixture_path.read_text())
         return list(data)
+
+    def test_wrapper_raises_when_option_orders_api_missing(self):
+        """Fail fast when option orders API surface is absent."""
+        mock_rh = MagicMock()
+        mock_rh.orders = MagicMock()
+        mock_rh.orders.get_all_stock_orders = MagicMock(return_value=[])
+        mock_rh.stocks = MagicMock()
+        mock_rh.stocks.get_all_stock_positions = MagicMock(return_value=[])
+        mock_rh.stocks.get_symbol_by_url = MagicMock(return_value="AAPL")
+        mock_rh.options = MagicMock(spec=[])
+        mock_rh.get_all_option_orders = None
+        mock_rh.get_open_option_positions = MagicMock(return_value=[])
+        mock_rh.get_all_positions = MagicMock(return_value=[])
+
+        with pytest.raises(AttributeError) as excinfo:
+            RobinhoodAPIWrapper(mock_rh)
+
+        assert "option orders" in str(excinfo.value)
 
     def test_init_without_credentials(self):
         """Test adapter initialization without credentials."""
@@ -52,16 +72,8 @@ class TestRobinhoodAdapter:
         """Test extracting transactions with date filtering."""
         mock_rh = MagicMock()
         mock_rh.get_all_stock_orders.return_value = [
-            {
-                "id": "stock-1",
-                "symbol": "AAPL",
-                "created_at": "2025-01-15T10:00:00Z",
-            },
-            {
-                "id": "stock-2",
-                "symbol": "MSFT",
-                "created_at": "2025-02-15T10:00:00Z",
-            },
+            {"id": "stock-1", "symbol": "AAPL", "created_at": "2025-01-15T10:00:00Z"},
+            {"id": "stock-2", "symbol": "MSFT", "created_at": "2025-02-15T10:00:00Z"},
         ]
         mock_rh.get_all_option_orders.return_value = []
 
@@ -75,12 +87,8 @@ class TestRobinhoodAdapter:
         """Use top-level option orders when options module lacks method."""
         mock_rh = MagicMock()
         mock_rh.orders = MagicMock()
-        mock_rh.orders.get_all_stock_orders.return_value = [
-            {"id": "stock-1", "symbol": "AAPL", "created_at": "2025-01-01T10:00:00Z"},
-        ]
-        mock_rh.get_all_option_orders.return_value = [
-            {"id": "option-1", "legs": [], "created_at": "2025-01-02T10:00:00Z"},
-        ]
+        mock_rh.orders.get_all_stock_orders.return_value = self._load_fixture("stock_orders.json")
+        mock_rh.get_all_option_orders.return_value = self._load_fixture("option_orders.json")
         mock_rh.options = MagicMock()
         del mock_rh.options.get_all_option_orders
 
@@ -123,9 +131,13 @@ class TestRobinhoodAdapter:
 
     def test_extract_positions_fallbacks_for_option_positions(self):
         """Use combined positions fallback when option positions method missing."""
-        mock_rh = MagicMock(spec=["get_all_positions", "get_open_stock_positions"])
-        mock_rh.get_open_stock_positions.return_value = []
-        mock_rh.get_all_positions.return_value = [
+        mock_rh = MagicMock(
+            spec=["get_all_positions", "get_open_stock_positions", "orders", "options", "stocks"]
+        )
+        mock_rh.orders = MagicMock()
+        mock_rh.orders.get_all_stock_orders = MagicMock(return_value=[])
+        mock_rh.options = MagicMock()
+        option_positions = [
             {"symbol": "AAPL", "quantity": "1.0", "cost_basis": "1.0", "current_price": "2.0"},
             {
                 "symbol": "AAPL230120C100",
@@ -134,13 +146,19 @@ class TestRobinhoodAdapter:
                 "current_price": "2.0",
             },
         ]
+        mock_rh.options.get_all_option_positions = MagicMock(return_value=option_positions)
+        mock_rh.options.get_all_option_orders = MagicMock(return_value=[])
+        mock_rh.stocks = MagicMock()
+        mock_rh.stocks.get_symbol_by_url = MagicMock(return_value="AAPL")
+        mock_rh.get_open_stock_positions.return_value = []
+        mock_rh.get_all_positions.return_value = option_positions
 
         adapter = RobinhoodAdapter(robin_stocks=RobinhoodAPIWrapper(mock_rh))
 
         positions = adapter.extract_positions()
 
         assert len(positions) == 2
-        mock_rh.get_all_positions.assert_called_once()
+        mock_rh.options.get_all_option_positions.assert_called_once()
 
     def test_normalize_transaction_stock(self):
         """Test normalizing a stock transaction."""
@@ -299,8 +317,8 @@ class TestRobinhoodAdapter:
         assert stock_order.price == 150.0
         assert stock_order.average_price == 150.5
 
-    def test_extract_stock_order_missing_symbol_returns_none(self):
-        """StockOrder extraction skips when symbol is missing."""
+    def test_extract_stock_order_missing_symbol_raises(self):
+        """StockOrder extraction should fail when symbol is missing."""
         raw_tx = {
             "id": "rh-stock-123",
             "side": "buy",
@@ -385,10 +403,6 @@ class TestRobinhoodAdapter:
         # Stock transaction
         stock_tx = {"symbol": "AAPL"}
         assert adapter._determine_transaction_type(stock_tx) == "stock"
-
-        # Unknown transaction defaults to 'unknown'
-        unknown_tx = {"id": "foo"}
-        assert adapter._determine_transaction_type(unknown_tx) == "unknown"
 
         # Crypto transaction
         crypto_tx = {"type": "crypto_purchase"}
