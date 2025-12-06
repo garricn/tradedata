@@ -32,6 +32,7 @@ class TestRobinhoodAdapter:
         mock_rh.get_all_positions = MagicMock(return_value=[])
         mock_rh.get_dividends = MagicMock(return_value=[])
         mock_rh.get_bank_transfers = MagicMock(return_value=[])
+        mock_rh.get_crypto_orders = MagicMock(return_value=[])
 
         with pytest.raises(AttributeError) as excinfo:
             RobinhoodAPIWrapper(mock_rh)
@@ -62,6 +63,8 @@ class TestRobinhoodAdapter:
         mock_rh.get_all_option_orders.return_value = self._load_fixture("option_orders.json")
         mock_rh.get_dividends.return_value = []
         mock_rh.get_bank_transfers.return_value = []
+        mock_rh.get_crypto_orders.return_value = []
+        mock_rh.get_crypto_orders.return_value = []
 
         adapter = RobinhoodAdapter(robin_stocks=mock_rh)
         transactions = adapter.extract_transactions()
@@ -82,6 +85,8 @@ class TestRobinhoodAdapter:
         mock_rh.get_all_option_orders.return_value = []
         mock_rh.get_dividends.return_value = []
         mock_rh.get_bank_transfers.return_value = []
+        mock_rh.get_crypto_orders.return_value = []
+        mock_rh.get_crypto_orders.return_value = []
 
         adapter = RobinhoodAdapter(robin_stocks=mock_rh)
         transactions = adapter.extract_transactions(start_date="2025-01-20", end_date="2025-02-10")
@@ -97,6 +102,7 @@ class TestRobinhoodAdapter:
         mock_rh.get_all_option_orders.return_value = self._load_fixture("option_orders.json")
         mock_rh.get_dividends = MagicMock(return_value=[])
         mock_rh.get_bank_transfers = MagicMock(return_value=[])
+        mock_rh.get_crypto_orders = MagicMock(return_value=[])
         mock_rh.options = MagicMock()
         del mock_rh.options.get_all_option_orders
 
@@ -113,6 +119,7 @@ class TestRobinhoodAdapter:
         mock_rh.get_all_option_orders.return_value = []
         mock_rh.get_dividends.return_value = self._load_fixture("dividends.json")
         mock_rh.get_bank_transfers.return_value = self._load_fixture("bank_transfers.json")
+        mock_rh.get_crypto_orders.return_value = []
 
         adapter = RobinhoodAdapter(robin_stocks=mock_rh)
         transactions = adapter.extract_transactions()
@@ -130,6 +137,7 @@ class TestRobinhoodAdapter:
         mock_rh.get_all_option_orders.return_value = []
         mock_rh.get_dividends.return_value = [{"amount": "1.00"}]  # id missing
         mock_rh.get_bank_transfers.return_value = []
+        mock_rh.get_crypto_orders.return_value = []
 
         adapter = RobinhoodAdapter(robin_stocks=mock_rh)
 
@@ -145,6 +153,37 @@ class TestRobinhoodAdapter:
         mock_rh.get_bank_transfers.return_value = [
             {"id": "x", "direction": "deposit"}
         ]  # amount missing
+        mock_rh.get_crypto_orders.return_value = []
+
+        adapter = RobinhoodAdapter(robin_stocks=mock_rh)
+
+        with pytest.raises(ValueError):
+            adapter.extract_transactions()
+
+    def test_extract_transactions_includes_crypto_orders(self):
+        """Crypto orders should be included and validated."""
+        mock_rh = MagicMock()
+        mock_rh.get_all_stock_orders.return_value = []
+        mock_rh.get_all_option_orders.return_value = []
+        mock_rh.get_dividends.return_value = []
+        mock_rh.get_bank_transfers.return_value = []
+        mock_rh.get_crypto_orders.return_value = self._load_fixture("crypto_orders.json")
+
+        adapter = RobinhoodAdapter(robin_stocks=mock_rh)
+        transactions = adapter.extract_transactions()
+
+        assert len(transactions) == 1
+        assert transactions[0]["id"] == "crypto-order-1"
+        mock_rh.get_crypto_orders.assert_called_once()
+
+    def test_extract_transactions_raises_on_missing_required_crypto_fields(self):
+        """Fail fast when required crypto fields are missing."""
+        mock_rh = MagicMock()
+        mock_rh.get_all_stock_orders.return_value = []
+        mock_rh.get_all_option_orders.return_value = []
+        mock_rh.get_dividends.return_value = []
+        mock_rh.get_bank_transfers.return_value = []
+        mock_rh.get_crypto_orders.return_value = [{"currency_code": "BTC", "side": "buy"}]
 
         adapter = RobinhoodAdapter(robin_stocks=mock_rh)
 
@@ -207,6 +246,8 @@ class TestRobinhoodAdapter:
         mock_rh.get_all_positions.return_value = option_positions
         mock_rh.get_dividends = MagicMock(return_value=[])
         mock_rh.get_bank_transfers = MagicMock(return_value=[])
+        mock_rh.get_crypto_orders = MagicMock(return_value=[])
+        mock_rh.get_all_crypto_orders = MagicMock(return_value=[])
 
         adapter = RobinhoodAdapter(robin_stocks=RobinhoodAPIWrapper(mock_rh))
 
@@ -506,6 +547,8 @@ class TestRobinhoodAdapter:
         # Crypto transaction
         crypto_tx = {"type": "crypto_purchase"}
         assert adapter._determine_transaction_type(crypto_tx) == "crypto"
+        crypto_tx_currency = {"currency_code": "ETH", "side": "buy"}
+        assert adapter._determine_transaction_type(crypto_tx_currency) == "crypto"
 
         # Dividend transaction
         dividend_tx = {"type": "dividend"}

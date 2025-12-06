@@ -156,6 +156,24 @@ class RobinhoodAPIWrapper:
                 "bank transfers",
             ),
         )
+        self._get_crypto_orders: Callable[[], list[dict[str, Any]]] = cast(
+            Callable[[], list[dict[str, Any]]],
+            _resolve_callable(
+                [
+                    (
+                        "crypto.get_all_crypto_orders",
+                        lambda: getattr(
+                            getattr(self.rh, "crypto", None), "get_all_crypto_orders", None
+                        ),
+                    ),
+                    (
+                        "get_all_crypto_orders",
+                        lambda: getattr(self.rh, "get_all_crypto_orders", None),
+                    ),
+                ],
+                "crypto orders",
+            ),
+        )
 
     def login(self, username: str, password: str) -> dict[str, Any]:
         """Login to Robinhood account."""
@@ -188,6 +206,10 @@ class RobinhoodAPIWrapper:
     def get_bank_transfers(self) -> list[dict[str, Any]]:
         """Get bank/ACH transfers."""
         return self._get_bank_transfers() or []
+
+    def get_crypto_orders(self) -> list[dict[str, Any]]:
+        """Get crypto orders."""
+        return self._get_crypto_orders() or []
 
 
 class RobinhoodAPI(Protocol):
@@ -251,6 +273,10 @@ class RobinhoodAPI(Protocol):
 
     def get_bank_transfers(self) -> list[dict[str, Any]]:
         """Get bank/ACH transfer transactions."""
+        ...
+
+    def get_crypto_orders(self) -> list[dict[str, Any]]:
+        """Get crypto orders."""
         ...
 
 
@@ -337,6 +363,15 @@ class RobinhoodAdapter(DataSourceAdapter):
             for transfer in transfers:
                 self._assert_required_fields(transfer, ["id", "amount", "direction"], "transfer")
             transactions.extend(transfers)
+
+        # Get crypto orders
+        crypto_orders = self.rh.get_crypto_orders()
+        if crypto_orders:
+            for crypto in crypto_orders:
+                self._assert_required_fields(
+                    crypto, ["id", "currency_code", "side", "quantity"], "crypto"
+                )
+            transactions.extend(crypto_orders)
 
         # Filter by date if provided
         if start_date or end_date:
@@ -490,6 +525,10 @@ class RobinhoodAdapter(DataSourceAdapter):
             or "expected_landing_date" in raw_transaction
         ):
             return "transfer"
+
+        # Check for crypto
+        if "crypto" in tx_type_field or raw_transaction.get("currency_code"):
+            return "crypto"
 
         # Check for stock-specific fields
         symbol = raw_transaction.get("symbol")
