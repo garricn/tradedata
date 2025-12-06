@@ -1,5 +1,6 @@
 """Show commands for transactions and positions."""
 
+from io import StringIO
 from typing import Iterable, Optional
 
 import click
@@ -18,16 +19,18 @@ def _table(headers: list[str], rows: Iterable[list[str]]) -> str:
     for row in rows:
         table.add_row(*row)
 
+    buffer = StringIO()
     console = Console(
         force_terminal=False,
         color_system=None,
         width=120,
         soft_wrap=True,
         record=True,
+        file=buffer,
     )
     console.print(table)
-    output = console.export_text()
-    return str(output)
+    output = buffer.getvalue()
+    return str(output).rstrip()
 
 
 @click.group(name="show")
