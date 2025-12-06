@@ -31,9 +31,7 @@ def test_sync_transactions_invokes_app(monkeypatch):
             "--end-date",
             "2025-02-01",
             "--types",
-            "stock",
-            "--types",
-            "option",
+            "stock,option",
         ],
     )
 

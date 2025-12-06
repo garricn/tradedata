@@ -35,10 +35,7 @@ def test_show_transactions_invokes_listing(monkeypatch):
     )
 
     runner = CliRunner()
-    result = runner.invoke(
-        cli,
-        ["show", "transactions", "--type", "stock", "--type", "crypto", "--days", "10"],
-    )
+    result = runner.invoke(cli, ["show", "transactions", "--type", "stock,crypto", "--days", "10"])
 
     assert result.exit_code == 0
     assert captured["transaction_types"] == ["stock", "crypto"]

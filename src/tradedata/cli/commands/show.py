@@ -40,7 +40,10 @@ def show() -> None:
     "--type",
     "transaction_types",
     multiple=True,
-    help="Filter by transaction types (repeatable, e.g., --type stock --type option).",
+    help=(
+        "Filter by transaction types (repeatable or comma-separated, "
+        "e.g., --type stock,option or --type stock --type option)."
+    ),
 )
 @click.option(
     "--days",
@@ -49,7 +52,7 @@ def show() -> None:
 )
 def show_transactions(transaction_types: tuple[str, ...], days: Optional[int]) -> None:
     """Show stored transactions with optional filters."""
-    tx_types = list(transaction_types) if transaction_types else None
+    tx_types = _parse_types_option(transaction_types)
     transactions = listing.list_transactions(transaction_types=tx_types, days=days)
     if not transactions:
         click.echo("No transactions found.")
@@ -92,3 +95,14 @@ def show_positions() -> None:
         rows,
     )
     click.echo(output)
+
+
+def _parse_types_option(types: Optional[tuple[str, ...]]) -> Optional[list[str]]:
+    """Flatten repeatable/CSV types into a list."""
+    if not types:
+        return None
+    flattened: list[str] = []
+    for entry in types:
+        parts = [part.strip() for part in entry.replace(",", " ").split() if part.strip()]
+        flattened.extend(parts)
+    return flattened or None
