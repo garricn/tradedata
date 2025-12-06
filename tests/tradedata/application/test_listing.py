@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 from tradedata.application import listing
-from tradedata.data.models import Position, Transaction
+from tradedata.data.models import OptionLeg, OptionOrder, Position, Transaction
 
 
 def test_list_transactions_filters_by_type_and_days(monkeypatch):
@@ -142,3 +142,82 @@ def test_list_transactions_last_applies_after_filters(monkeypatch):
     result = listing.list_transactions(transaction_type="stock", last=2)
 
     assert result == [tx_new, tx_mid]
+
+
+def test_get_transaction_details_includes_raw_and_type_specific(monkeypatch):
+    """Ensure transaction detail returns base, raw, and typed fields."""
+    tx = Transaction(
+        id="tx-1",
+        source="robinhood",
+        source_id="rh-1",
+        type="option",
+        created_at="2025-12-01T00:00:00Z",
+        account_id="acc-1",
+        raw_data='{"symbol":"AAPL","foo":"bar"}',
+    )
+    option_order = OptionOrder(
+        id="tx-1",
+        chain_symbol="AAPL",
+        opening_strategy="call_buy",
+        closing_strategy=None,
+        direction="debit",
+        premium=1.23,
+        net_amount=-123.0,
+    )
+    leg = OptionLeg(
+        id="leg-1",
+        order_id="tx-1",
+        strike_price=150.0,
+        expiration_date="2025-12-19",
+        option_type="call",
+        side="buy",
+        position_effect="open",
+        ratio_quantity=1,
+    )
+
+    class FakeTxRepo:
+        def __init__(self, _storage=None):
+            pass
+
+        def find_all(self):
+            return [tx]
+
+    class FakeOptionRepo:
+        def __init__(self, _storage=None):
+            pass
+
+        def find_all(self):
+            return [option_order]
+
+    class FakeLegRepo:
+        def __init__(self, _storage=None):
+            pass
+
+        def find_all(self):
+            return [leg]
+
+    class FakeStockRepo:
+        def __init__(self, _storage=None):
+            pass
+
+        def find_all(self):
+            return []
+
+    class FakeStorage:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    monkeypatch.setattr("tradedata.application.listing.TransactionRepository", FakeTxRepo)
+    monkeypatch.setattr("tradedata.application.listing.OptionOrderRepository", FakeOptionRepo)
+    monkeypatch.setattr("tradedata.application.listing.OptionLegRepository", FakeLegRepo)
+    monkeypatch.setattr("tradedata.application.listing.StockOrderRepository", FakeStockRepo)
+    monkeypatch.setattr("tradedata.application.listing.Storage", FakeStorage)
+
+    details = listing.get_transaction_details(ids=["tx-1"])
+
+    assert len(details) == 1
+    fields = dict(details[0].fields)
+    assert fields["id"] == "tx-1"
+    assert fields["raw.foo"] == "bar"
+    assert fields["chain_symbol"] == "AAPL"
+    assert fields["leg[0].strike_price"] == "150.0"

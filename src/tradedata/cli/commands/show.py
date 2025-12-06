@@ -33,6 +33,28 @@ def _table(headers: list[str], rows: Iterable[list[str]]) -> str:
     return str(output).rstrip()
 
 
+def _detail_table(fields: list[tuple[str, str]]) -> str:
+    """Render key/value transaction detail table."""
+    table = Table(show_header=True, header_style="bold", box=box.SIMPLE, expand=True)
+    table.add_column("Field", overflow="fold")
+    table.add_column("Value", overflow="fold")
+    for field, value in fields:
+        table.add_row(field, value)
+
+    buffer = StringIO()
+    console = Console(
+        force_terminal=False,
+        color_system=None,
+        width=120,
+        soft_wrap=True,
+        record=True,
+        file=buffer,
+    )
+    console.print(table)
+    output = buffer.getvalue()
+    return str(output).rstrip()
+
+
 @click.group(name="show")
 def show() -> None:
     """Show data from the local database."""
@@ -63,13 +85,46 @@ def show() -> None:
     type=click.IntRange(min=1),
     help="Show only the most recent N transactions (after other filters).",
 )
+@click.option(
+    "--id",
+    "transaction_ids",
+    multiple=True,
+    help="Show specific transaction(s) by ID (ignores other filters).",
+)
+@click.option(
+    "--source-id",
+    "source_ids",
+    multiple=True,
+    help="Show transaction(s) by source ID (mutually exclusive with --id).",
+)
 def show_transactions(
     transaction_types: tuple[str, ...],
     days: Optional[int],
     raw: bool,
+    transaction_ids: tuple[str, ...],
+    source_ids: tuple[str, ...],
     last: Optional[int],
 ) -> None:
     """Show stored transactions with optional filters."""
+    if transaction_ids and source_ids:
+        raise click.UsageError("Use either --id or --source-id, not both.")
+
+    if transaction_ids or source_ids:
+        details = listing.get_transaction_details(
+            ids=list(transaction_ids) if transaction_ids else None,
+            source_ids=list(source_ids) if source_ids else None,
+        )
+        if not details:
+            click.echo("No transactions found.")
+            return
+
+        for idx, detail in enumerate(details):
+            click.echo(f"Transaction {detail.transaction_id}")
+            click.echo(_detail_table(detail.fields))
+            if idx < len(details) - 1:
+                click.echo()
+        return
+
     tx_types = _parse_types_option(transaction_types)
     if raw:
         transactions = listing.list_transactions(transaction_types=tx_types, days=days, last=last)

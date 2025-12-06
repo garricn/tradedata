@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from click.testing import CliRunner
 
-from tradedata.application.listing import TransactionTable
+from tradedata.application.listing import TransactionDetail, TransactionTable
 from tradedata.cli.main import cli
 from tradedata.data.models import Position, Transaction
 
@@ -50,6 +50,35 @@ def test_show_transactions_invokes_listing(monkeypatch):
     assert captured["last"] is None
     assert "tx-recent" in result.output
     assert "stock" in result.output
+
+
+def test_show_transactions_detail_by_id(monkeypatch):
+    """Ensure detail lookup by id renders fields and ignores other filters."""
+    captured = {}
+
+    def fake_get_details(ids=None, source_ids=None, storage=None):
+        captured["ids"] = ids
+        captured["source_ids"] = source_ids
+        return [
+            TransactionDetail(
+                transaction_id="tx-1",
+                fields=[("id", "tx-1"), ("foo", "bar")],
+            )
+        ]
+
+    monkeypatch.setattr(
+        "tradedata.cli.commands.show.listing.get_transaction_details",
+        fake_get_details,
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["show", "transactions", "--id", "tx-1", "--days", "5"])
+
+    assert result.exit_code == 0
+    assert captured["ids"] == ["tx-1"]
+    assert captured["source_ids"] is None
+    assert "foo" in result.output
+    assert "bar" in result.output
 
 
 def test_show_positions_invokes_listing(monkeypatch):

@@ -81,6 +81,14 @@ class TransactionTable:
     rows: list[list[str]]
 
 
+@dataclass
+class TransactionDetail:
+    """Structured detail for a single transaction."""
+
+    transaction_id: str
+    fields: list[tuple[str, str]]
+
+
 def list_enriched_transaction_tables(
     transaction_types: Optional[list[str]] = None,
     days: Optional[int] = None,
@@ -152,6 +160,99 @@ def list_positions(storage: Optional[Storage] = None) -> list[Position]:
     storage = storage or Storage()
     repo = PositionRepository(storage)
     return repo.find_all()
+
+
+def get_transaction_details(
+    ids: Optional[list[str]] = None,
+    source_ids: Optional[list[str]] = None,
+    storage: Optional[Storage] = None,
+) -> list[TransactionDetail]:
+    """Return detailed field/value pairs for transactions by id or source_id."""
+    storage = storage or Storage()
+    repo = TransactionRepository(storage)
+
+    transactions = repo.find_all()
+    if ids:
+        id_set = set(ids)
+        transactions = [tx for tx in transactions if tx.id in id_set]
+    elif source_ids:
+        source_set = set(source_ids)
+        transactions = [tx for tx in transactions if tx.source_id in source_set]
+    else:
+        return []
+
+    if not transactions:
+        return []
+
+    tx_ids = {tx.id for tx in transactions}
+    stock_repo = StockOrderRepository(storage)
+    stock_orders = {order.id: order for order in stock_repo.find_all() if order.id in tx_ids}
+
+    option_repo = OptionOrderRepository(storage)
+    option_orders = {order.id: order for order in option_repo.find_all() if order.id in tx_ids}
+
+    leg_repo = OptionLegRepository(storage)
+    legs_by_order: dict[str, list[OptionLeg]] = defaultdict(list)
+    for leg in leg_repo.find_all():
+        if leg.order_id in option_orders:
+            legs_by_order[leg.order_id].append(leg)
+
+    details: list[TransactionDetail] = []
+    for tx in transactions:
+        fields: list[tuple[str, str]] = [
+            ("id", tx.id),
+            ("source", tx.source),
+            ("source_id", tx.source_id),
+            ("type", tx.type),
+            ("created_at", tx.created_at),
+            ("account_id", tx.account_id or ""),
+        ]
+
+        raw = tx.get_raw_data_dict()
+        for key in sorted(raw.keys()):
+            fields.append((f"raw.{key}", str(raw.get(key, ""))))
+
+        if tx.type == "stock":
+            stock_order = stock_orders.get(tx.id)
+            if stock_order:
+                fields.extend(
+                    [
+                        ("symbol", str(stock_order.symbol)),
+                        ("side", str(stock_order.side)),
+                        ("quantity", str(stock_order.quantity)),
+                        ("price", str(stock_order.price)),
+                        ("average_price", str(stock_order.average_price)),
+                    ]
+                )
+        elif tx.type == "option":
+            option_order = option_orders.get(tx.id)
+            if option_order:
+                fields.extend(
+                    [
+                        ("chain_symbol", str(option_order.chain_symbol)),
+                        ("direction", str(option_order.direction)),
+                        ("opening_strategy", str(option_order.opening_strategy or "")),
+                        ("closing_strategy", str(option_order.closing_strategy or "")),
+                        ("premium", str(option_order.premium)),
+                        ("net_amount", str(option_order.net_amount)),
+                    ]
+                )
+                legs = legs_by_order.get(tx.id, [])
+                for idx, leg in enumerate(legs):
+                    fields.extend(
+                        [
+                            (f"leg[{idx}].side", str(leg.side)),
+                            (f"leg[{idx}].position_effect", str(leg.position_effect)),
+                            (f"leg[{idx}].ratio_quantity", str(leg.ratio_quantity)),
+                            (f"leg[{idx}].strike_price", str(leg.strike_price)),
+                            (f"leg[{idx}].option_type", str(leg.option_type)),
+                            (f"leg[{idx}].expiration_date", str(leg.expiration_date)),
+                        ]
+                    )
+
+        details.append(TransactionDetail(transaction_id=tx.id, fields=fields))
+
+    return details
 
 
 def _build_stock_table(
